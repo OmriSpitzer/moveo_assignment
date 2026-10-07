@@ -29,6 +29,14 @@ npm run dev
 
 Open the local URL Vite prints.
 
+Both images come from the root `Dockerfile`. From the repository root:
+
+```bash
+docker compose -f docker-compose.yaml up --build
+```
+
+The chat is at http://localhost:8080 and the API at http://localhost:8000. Compose reads `server/.env`. If Ollama or MongoDB is on the host, point `BASE_URL` and `MONGODB_URI` at `host.docker.internal` instead of `127.0.0.1`.
+
 ## Repository
 
 ```

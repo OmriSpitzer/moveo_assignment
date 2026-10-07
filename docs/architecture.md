@@ -57,7 +57,13 @@ docs/
   requirements.md
   architecture.md
   tests.md
+Dockerfile              api image and web image
+docker-compose.yaml     runs both; reads server/.env
 ```
+
+## Containers
+
+`Dockerfile` builds two images from one file. The `api` target runs `python server.py` on port 8000. The `web` target builds the React app and serves it with nginx on port 80. nginx proxies `/api` to the `api` service, including the agent stream. `docker-compose.yaml` publishes the API on 8000 and the chat on 8080. It loads `server/.env` and sets `HOST` to `0.0.0.0`. A `BASE_URL` or `MONGODB_URI` that points at `127.0.0.1` is the container itself, so Ollama or MongoDB on the host must use `host.docker.internal`.
 
 ## Data storage
 

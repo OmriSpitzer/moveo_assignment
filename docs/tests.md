@@ -490,3 +490,13 @@ npx tsc -p tsconfig.app.json --noEmit
 ```
 
 Expected: exit status 0. Result 2026-10-07: passed.
+
+## Docker Compose (2026-10-07 21:10)
+
+`Dockerfile` has `api` and `web` targets. `docker-compose.yaml` runs both. Run from the repository root.
+
+```bash
+docker compose -f docker-compose.yaml config
+```
+
+Expected: a resolved config whose services are `api` and `web`, with `api` port `8000` and `web` port `8080`.
