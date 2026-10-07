@@ -1,6 +1,5 @@
 import os
 from datetime import datetime, timezone
-import certifi
 from pymongo import ASCENDING, MongoClient
 from pymongo.collection import Collection
 from pymongo.database import Database
@@ -29,7 +28,7 @@ class DataManager:
         if cls._client is None:
             # try to connect to MongoDB
             try:
-                cls._client = MongoClient(os.getenv("MONGODB_URI"), tlsCAFile=certifi.where())
+                cls._client = MongoClient(os.getenv("MONGODB_URI"))
             except Exception as e:
                 raise RuntimeError("Failed to connect to MongoDB")
         return cls._client[os.getenv("MONGODB_DB", os.getenv("DEFAULT_DB_NAME"))]

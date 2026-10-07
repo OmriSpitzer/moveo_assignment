@@ -35,7 +35,7 @@ The API image is the root `Dockerfile`. From the repository root:
 docker compose -f docker-compose.yaml up --build
 ```
 
-The API is at http://localhost:8000. Compose reads `server/.env` and listens on `0.0.0.0:8000`. The chat still runs with `npm run dev` in `weather-app/`. If Ollama or MongoDB is on the host, point `BASE_URL` and `MONGODB_URI` at `host.docker.internal` instead of `127.0.0.1`.
+The image serves the chat at `/` and the API under `/api`, on port 8000. Compose reads `server/.env`. Locally, `npm run dev` in `weather-app/` is still the dev chat. If Ollama or MongoDB is on the host, point `BASE_URL` and `MONGODB_URI` at `host.docker.internal` instead of `127.0.0.1`.
 
 ## Repository
 

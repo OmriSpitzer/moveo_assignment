@@ -501,12 +501,22 @@ python -c "from pathlib import Path; t=Path('Dockerfile').read_text(encoding='ut
 
 Expected: `True True True True True`. Result 2026-10-07: passed.
 
-## Atlas TLS from the API image (2026-10-07 21:23)
+## Atlas client without certifi (2026-10-07 21:28)
 
-The image installs CA certificates, and the Mongo client uses `certifi`. Run from the repository root.
+`MongoClient` takes only `MONGODB_URI`. The image does not install CA certificates. Run from the repository root.
 
 ```bash
-python -c "from pathlib import Path; d=Path('Dockerfile').read_text(encoding='utf-8'); m=Path('server/data/manager.py').read_text(encoding='utf-8'); print('ca-certificates' in d, 'tlsCAFile=certifi.where()' in m)"
+python -c "from pathlib import Path; d=Path('Dockerfile').read_text(encoding='utf-8'); m=Path('server/data/manager.py').read_text(encoding='utf-8'); r=Path('server/requirements.txt').read_text(encoding='utf-8'); print('certifi' not in m, 'ca-certificates' not in d, 'certifi' not in r)"
 ```
 
-Expected: `True True`. Result 2026-10-07: passed.
+Expected: `True True True`. Result 2026-10-07: passed.
+
+## Chat served at / (2026-10-07 21:33)
+
+The image builds `weather-app` and the API serves that build at `/`. `/json/version` still returns the API name when the build is absent. Run from the repository root.
+
+```bash
+python -c "from pathlib import Path; d=Path('Dockerfile').read_text(encoding='utf-8'); s=Path('server/server.py').read_text(encoding='utf-8'); print('npm run build' in d, 'COPY --from=client /web/dist ./static' in d, 'StaticFiles' in s, 'PORT=8000' in d)"
+```
+
+Expected: `True True True True`. Result 2026-10-07: passed.

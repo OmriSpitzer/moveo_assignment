@@ -63,11 +63,11 @@ docker-compose.yaml     runs the API and reads server/.env
 
 ## Containers
 
-`Dockerfile` is one Python image. It runs `python server.py` with `HOST=0.0.0.0` and `PORT=8000`. `docker-compose.yaml` publishes that port and loads `server/.env`. The chat stays the Vite app in `weather-app/`. A `BASE_URL` or `MONGODB_URI` that points at `127.0.0.1` is the container itself, so Ollama or MongoDB on the host must use `host.docker.internal`.
+`Dockerfile` builds the React app, then a Python image that runs `python server.py` with `HOST=0.0.0.0` and `PORT=8000`. That image serves the built chat at `/` and the API under `/api`. `docker-compose.yaml` publishes that port and loads `server/.env`. `npm run dev` in `weather-app/` is the local chat. A `BASE_URL` or `MONGODB_URI` that points at `127.0.0.1` is the container itself, so Ollama or MongoDB on the host must use `host.docker.internal`.
 
 ## Data storage
 
-MongoDB (`server/data/manager.py`), chosen because the app will run on the internet with a hosted database. The API image installs CA certificates, and the client passes `certifi` as the TLS CA file so the Atlas handshake succeeds from that image. One collection, `hubs`, one document per hub:
+MongoDB (`server/data/manager.py`), chosen because the app will run on the internet with a hosted database. One collection, `hubs`, one document per hub:
 
 - `city`, `city_key` (unique, lowercase), `state_code`, `region`, optional `county` override, `created_at`. The seed includes `location` (latitude, longitude, county) for every hub. Existing hub documents missing coordinates get that seed location on startup.
 - The agent does not add or update hubs. It calls `get_location` only when `list_hubs` did not already return coordinates. `get_location` takes the city list and resolves every city in parallel inside that one call. It then calls `get_weather_history`, `get_disaster_history`, `get_active_alerts`, and `get_current_weather` only for the sections a question needs. `get_current_weather` is the Open-Meteo forecast current block, used when the question asks what the weather is now. Each of those tools takes a list and fetches every place in that one call.
@@ -82,7 +82,7 @@ The Ollama agent stores each chat in process memory (`InMemorySaver`), keyed by 
 
 ## Assumptions and scope
 
-The agent is registered with read tools only: `list_hubs`, `score_hubs`, `get_location`, and the weather, disaster, alert, and current-weather getters. A weather question may call tools. A general question (how the score works, or a greeting) is answered without a tool. A question about technologies, or a request to add, update, or remove hubs, is answered by the model itself, in one or two friendly sentences, with no tool call and no list of tool names. A city that is not a hub is named as such, with the hubs in that region, and no data is fetched for it. `GET /` and `GET /json/version` on the API port return the API name so those probes are not 404. Weather answers name a fact once, and mention total snowfall only when the user asks how much snow fell. If the hub or the hazard is missing, the reply is one follow-up question and does not describe what data is available. A question that names no hub does not call a tool, including `list_hubs`, and asks which hub.
+The agent is registered with read tools only: `list_hubs`, `score_hubs`, `get_location`, and the weather, disaster, alert, and current-weather getters. A weather question may call tools. A general question (how the score works, or a greeting) is answered without a tool. A question about technologies, or a request to add, update, or remove hubs, is answered by the model itself, in one or two friendly sentences, with no tool call and no list of tool names. A city that is not a hub is named as such, with the hubs in that region, and no data is fetched for it. When the image includes the built chat, `GET /` serves that client. `GET /json/version` returns the API name. Without the built chat, `GET /` returns the API name so that probe is not 404. Weather answers name a fact once, and mention total snowfall only when the user asks how much snow fell. If the hub or the hazard is missing, the reply is one follow-up question and does not describe what data is available. A question that names no hub does not call a tool, including `list_hubs`, and asks which hub.
 
 ## Evaluation
 
