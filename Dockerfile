@@ -24,9 +24,11 @@ COPY <<'EOF' /etc/nginx/conf.d/default.conf
 server {
     listen 80;
     root /usr/share/nginx/html;
+    resolver 127.0.0.11 valid=10s ipv6=off;
 
     location /api/ {
-        proxy_pass http://api:8000;
+        set $api_backend api:8000;
+        proxy_pass http://$api_backend$request_uri;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;

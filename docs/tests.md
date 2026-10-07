@@ -500,3 +500,13 @@ docker compose -f docker-compose.yaml config
 ```
 
 Expected: a resolved config whose services are `api` and `web`, with `api` port `8000` and `web` port `8080`.
+
+## Web container starts without the API name (2026-10-07 21:15)
+
+nginx resolves `api` when a request arrives, using Docker's DNS. Run from the repository root.
+
+```bash
+python -c "from pathlib import Path; t=Path('Dockerfile').read_text(encoding='utf-8'); print('resolver 127.0.0.11' in t, 'set $api_backend api:8000' in t, 'proxy_pass http://api:8000' not in t)"
+```
+
+Expected: `True True True`. Result 2026-10-07: passed.
