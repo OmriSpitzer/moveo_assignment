@@ -1,7 +1,4 @@
 from dotenv import load_dotenv
-from fastapi import FastAPI
-from routes.agent_routes import router
-from data.manager import DataManager
 import os
 
 """
@@ -10,6 +7,10 @@ import os
 
 # load environment variables
 load_dotenv()
+
+from fastapi import FastAPI
+from routes.agent_routes import router
+from data.manager import DataManager
 
 # initialize the data manager
 DataManager.init()

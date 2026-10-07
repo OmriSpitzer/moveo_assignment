@@ -1,7 +1,7 @@
 import os
 from typing import Iterator, Sequence
 from dotenv import load_dotenv
-from langchain.agents import create_agent, AgentState
+from langchain.agents import create_agent
 from langchain.agents.middleware import ModelCallLimitMiddleware
 from langchain.agents.structured_output import ToolStrategy
 from langchain_core.messages import AIMessage, BaseMessage, ToolMessage
@@ -27,15 +27,9 @@ from agent.tools.weather_tools import WeatherTools
     Methods:
         get_response(messages: Sequence[BaseMessage], thread_id: str | None = None) -> str:
             Get a response from the agent
+        stream(messages: Sequence[BaseMessage], thread_id: str | None = None) -> Iterator[dict]:
+            Stream a response from the agent
 """
-
-# Agent custom state used by the agent
-class CustomAgentState(AgentState):
-    timestamp: str
-
-
-def agent_tools():
-    return HubTools.get_tools() + LocationTools.get_tools() + WeatherTools.get_tools()
 
 class OllamaAgent(BaseAgent):
     def __init__(self) -> None:
@@ -54,9 +48,8 @@ class OllamaAgent(BaseAgent):
             checkpointer=self._memory,
             middleware=[ModelCallLimitMiddleware(run_limit=int(os.getenv("RUN_LIMIT")), exit_behavior="end")],
             response_format=ToolStrategy(LLMAnswer),
-            state_schema=CustomAgentState,
             system_prompt=SYSTEM_PROMPT,
-            tools=agent_tools()
+            tools=HubTools.get_tools() + LocationTools.get_tools() + WeatherTools.get_tools()
         )
 
     # Get a response from the agent
@@ -64,55 +57,62 @@ class OllamaAgent(BaseAgent):
         if not messages:
             raise ValueError("messages must not be empty")
         
+        # stream the response from the agent
         for event in self.stream(messages, thread_id):
+            # check if the event is an answer
             if event["type"] == "answer":
                 return Answer(**event["answer"])
-            if event["type"] == "error":
+
+            # check if the event is an error
+            elif event["type"] == "error":
                 return ERROR_ANSWER(event["message"], self.model, messages[-1].content)
+
+        # return an error answer if the agent finished without a structured answer
         return ERROR_ANSWER("agent finished without a structured answer", self.model, messages[-1].content)
 
-    # A saved thread already has earlier turns, so only the new message is added
-    def _messages_for_turn(self, messages: Sequence[BaseMessage], thread_id: str) -> list[BaseMessage]:
-        prior = self._agent.get_state({"configurable": {"thread_id": thread_id}}).values.get("messages")
-        return [messages[-1]] if prior else list(messages)
-
-    # Fill the fields the LLM does not produce
-    def _to_answer(self, llm_answer: LLMAnswer, timestamp: str, prompt: str) -> Answer:
-        return Answer(timestamp=timestamp, model=self.model, prompt=prompt, answer=llm_answer.answer)
-
-    # Stream tool calls and results as they happen, then the final answer
+    # Stream a response from the agent
     def stream(self, messages: Sequence[BaseMessage], thread_id: str | None = None) -> Iterator[dict]:
         if not messages:
             raise ValueError("messages must not be empty")
-
+        
+        # create a new thread id if one is not provided
         thread_id = thread_id or str(uuid.uuid4())
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         answer = None
         plain_text = None
         failure_reason = "agent finished without a structured answer"
 
+        # get the prior messages from the agent
+        prior = self._agent.get_state({"configurable": {"thread_id": thread_id}}).values.get("messages")
+        stream_messages = [messages[-1]] if prior else list(messages)
+        
+        # stream the response from the agent
         for chunk in self._agent.stream(
-            {"messages": self._messages_for_turn(messages, thread_id), "timestamp": timestamp},
+            {"messages": stream_messages, "timestamp": timestamp},
             config={"configurable": {"thread_id": thread_id}},
             stream_mode="updates",
         ):
             for node, update in chunk.items():
                 if not isinstance(update, dict):
                     continue
+
+                # process the messages
                 for message in update.get("messages", []):
-                    # The structured output arrives as an "LLMAnswer" tool call, which is not a real tool
                     if isinstance(message, AIMessage):
-                        # Ollama ignores tool_choice, so the model may answer in plain text instead of LLMAnswer;
-                        # plain text from a middleware node is the call limit message, not an answer
+                        # string answer from the agent with no tool calls
                         if not message.tool_calls and str(message.content).strip():
                             if node == "model":
                                 plain_text = str(message.content).strip()
                             else:
                                 failure_reason = f"agent stopped: {message.content}"
                                 plain_text = None
+
+                        # stream the tool calls
                         for call in message.tool_calls:
                             if call["name"] != LLMAnswer.__name__:
                                 yield {"type": "tool_call", "id": call["id"], "name": call["name"], "args": call["args"]}
+                    
+                    # check if the agent returned a tool result
                     elif isinstance(message, ToolMessage):
                         if message.name != LLMAnswer.__name__:
                             yield {
@@ -121,13 +121,29 @@ class OllamaAgent(BaseAgent):
                                 "name": message.name,
                                 "content": str(message.content)[:500],
                             }
+
                         elif message.status == "error" or "error" in str(message.content).lower():
                             failure_reason = f"invalid structured answer: {message.content}"
-                if isinstance(update.get("structured_response"), LLMAnswer):
-                    answer = self._to_answer(update["structured_response"], timestamp, messages[-1].content)
 
+                # check if the agent returned a structured answer
+                if isinstance(update.get("structured_response"), LLMAnswer):
+                    answer = Answer(
+                        timestamp=timestamp,
+                        model=self.model,
+                        prompt=messages[-1].content,
+                        answer=update["structured_response"].answer,
+                    )
+
+        # check if the agent returned a plain text answer
         if answer is None and plain_text:
-            answer = self._to_answer(LLMAnswer.model_validate({"answer": plain_text}), timestamp, messages[-1].content)
+            answer = Answer(
+                timestamp=timestamp,
+                model=self.model,
+                prompt=messages[-1].content,
+                answer=plain_text,
+            )
+        
+        # no answer -> stream an error
         if answer is None:
             yield {"type": "error", "message": failure_reason}
             return

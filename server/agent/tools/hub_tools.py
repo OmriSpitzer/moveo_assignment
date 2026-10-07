@@ -5,7 +5,7 @@ from langchain_core.tools import tool
 from agent.schema.tool_results import (
     ActiveAlerts, DisasterHistory, FactorScore, Hub, HubScore, Location, RiskScore, ToolError, WeatherHistory,
 )
-from agent.scoring.score import score_hub, score_needs_refresh
+from agent.scoring.score import ScoreMethod
 from agent.tools.db_tools import DbTools
 from agent.tools.weather_tools import WeatherTools
 from data.manager import DataManager
@@ -19,13 +19,80 @@ from data.manager import DataManager
         get_tools() -> list[Callable[[], Any]]
 """
 
+# Get the stored score
+def _stored_score(raw) -> tuple[RiskScore, datetime] | None:
+    if not isinstance(raw, dict) or raw.get("scored_at") is None:
+        return None
+    scored_at = raw["scored_at"]
+    if isinstance(scored_at, str):
+        scored_at = datetime.fromisoformat(scored_at)
+    if not isinstance(scored_at, datetime):
+        return None
+    if scored_at.tzinfo is None:
+        scored_at = scored_at.replace(tzinfo=timezone.utc)
+    factors = [
+        FactorScore(name=row["name"], points=float(row["points"]), weight=float(row["weight"]), detail=row["detail"])
+        for row in raw.get("factors") or []
+    ]
+    score = raw.get("score")
+    return RiskScore(
+        score=None if score is None else float(score),
+        factors=factors,
+        excluded=list(raw.get("excluded") or []),
+    ), scored_at
+
+# Build the hub score object
+def _hub_score(doc: dict, risk: RiskScore, scored_at: datetime, refreshed: bool) -> HubScore:
+    if scored_at.tzinfo is None:
+        scored_at = scored_at.replace(tzinfo=timezone.utc)
+    return HubScore(
+        city=doc["city"],
+        state_code=doc["state_code"],
+        region=doc["region"],
+        score=risk.score,
+        factors=risk.factors,
+        excluded=list(risk.excluded),
+        scored_at=scored_at.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
+        refreshed=refreshed,
+    )
+
+# Save the score
+def _save_score(doc: dict, risk: RiskScore, scored_at: datetime) -> None:
+    payload = asdict(risk)
+    payload["scored_at"] = scored_at
+    DbTools.set_fields({"city_key": doc["city_key"]}, {"score": payload})
+
+# Refresh the scores
+def _refresh_scores(pending: list[tuple[int, dict]], results: list, now: datetime) -> None:
+    points = []
+    places = []
+    for _, doc in pending:
+        location = doc["location"]
+        points.append({"latitude": location["latitude"], "longitude": location["longitude"]})
+        places.append({
+            "state_code": doc["state_code"],
+            "county": doc.get("county") or location.get("county"),
+        })
+    year = datetime.now(timezone.utc).year - 1
+    start_date, end_date = f"{year}-01-01", f"{year}-12-31"
+    weather = WeatherTools.get_weather_history.invoke({"points": points, "start_date": start_date, "end_date": end_date})
+    disasters = WeatherTools.get_disaster_history.invoke({"places": places})
+    alerts = WeatherTools.get_active_alerts.invoke({"points": points})
+    for n, (i, doc) in enumerate(pending):
+        risk = ScoreMethod.score_hub(weather[n], disasters[n], alerts[n])
+        complete = all(
+            isinstance(item, (WeatherHistory, DisasterHistory, ActiveAlerts))
+            for item in (weather[n], disasters[n], alerts[n])
+        )
+        if complete and risk.score is not None:
+            _save_score(doc, risk, now)
+        results[i] = _hub_score(doc, risk, now, refreshed=True)
 
 class HubTools:
     # List the company's distribution hubs
     @tool()
     def list_hubs() -> list[Hub]:
-        """ List the company's distribution hubs (city, 2-letter state code, US region: Northeast, 
-        Midwest, South, West). Answers may only cover these hubs."""
+        """Company hubs: city, state code, region, county, and coordinates when stored."""
         
         docs = DbTools.find_all(projection={"city": 1, "state_code": 1, "region": 1, "county": 1, "location": 1})
 
@@ -45,9 +112,7 @@ class HubTools:
 
     @tool
     def score_hubs(cities: list[str]) -> list[HubScore | ToolError]:
-        """Score company hubs from 0 to 100 for a ranking or comparison.
-        A stored score no older than one day is returned unchanged. A missing score, or one older than one day, is recalculated and saved.
-        Results are highest score first. A city that is not a hub is an error after the scores. Pass every city in one call."""
+        """0-100 risk score per hub, highest first. A score older than one day is refreshed. Pass every city in one call."""
         now = datetime.now(timezone.utc)
         results: list[HubScore | ToolError | None] = [None] * len(cities)
         pending: list[tuple[int, dict]] = []
@@ -57,7 +122,7 @@ class HubTools:
                 results[i] = ToolError(source="hubs", error=f"{city} is not a company hub")
                 continue
             stored = _stored_score(doc.get("score"))
-            if stored is not None and not score_needs_refresh(stored[1], now):
+            if stored is not None and not ScoreMethod.score_needs_refresh(stored[1], now):
                 results[i] = _hub_score(doc, stored[0], stored[1], refreshed=False)
                 continue
             location = doc.get("location") or {}
@@ -78,9 +143,7 @@ class HubTools:
         city: str, state_code: str, region: Literal["Northeast", "Midwest", "South", "West"],
         latitude: float, longitude: float, county: str | None = None, state: str | None = None,
     ) -> Hub | ToolError:
-        """Add a new company hub, or update an existing hub's state code and region.
-        Pass latitude, longitude, and county from get_location, or from list_hubs when it already returned them.
-        Only call this when the user explicitly asks to add or change a hub."""
+        """Add or update a hub. Call only when the user asks to add or change one."""
 
         location = Location(
             source="open-meteo-geocoding",
@@ -116,76 +179,3 @@ class HubTools:
     @staticmethod
     def get_tools():
         return [HubTools.list_hubs, HubTools.score_hubs]
-
-
-def _last_calendar_year() -> tuple[str, str]:
-    year = datetime.now(timezone.utc).year - 1
-    return f"{year}-01-01", f"{year}-12-31"
-
-
-def _stored_score(raw) -> tuple[RiskScore, datetime] | None:
-    if not isinstance(raw, dict) or raw.get("scored_at") is None:
-        return None
-    scored_at = raw["scored_at"]
-    if isinstance(scored_at, str):
-        scored_at = datetime.fromisoformat(scored_at)
-    if not isinstance(scored_at, datetime):
-        return None
-    if scored_at.tzinfo is None:
-        scored_at = scored_at.replace(tzinfo=timezone.utc)
-    factors = [
-        FactorScore(name=row["name"], points=float(row["points"]), weight=float(row["weight"]), detail=row["detail"])
-        for row in raw.get("factors") or []
-    ]
-    score = raw.get("score")
-    return RiskScore(
-        score=None if score is None else float(score),
-        factors=factors,
-        excluded=list(raw.get("excluded") or []),
-    ), scored_at
-
-
-def _hub_score(doc: dict, risk: RiskScore, scored_at: datetime, refreshed: bool) -> HubScore:
-    if scored_at.tzinfo is None:
-        scored_at = scored_at.replace(tzinfo=timezone.utc)
-    return HubScore(
-        city=doc["city"],
-        state_code=doc["state_code"],
-        region=doc["region"],
-        score=risk.score,
-        factors=risk.factors,
-        excluded=list(risk.excluded),
-        scored_at=scored_at.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
-        refreshed=refreshed,
-    )
-
-
-def _save_score(doc: dict, risk: RiskScore, scored_at: datetime) -> None:
-    payload = asdict(risk)
-    payload["scored_at"] = scored_at
-    DbTools.set_fields({"city_key": doc["city_key"]}, {"score": payload})
-
-
-def _refresh_scores(pending: list[tuple[int, dict]], results: list, now: datetime) -> None:
-    points = []
-    places = []
-    for _, doc in pending:
-        location = doc["location"]
-        points.append({"latitude": location["latitude"], "longitude": location["longitude"]})
-        places.append({
-            "state_code": doc["state_code"],
-            "county": doc.get("county") or location.get("county"),
-        })
-    start_date, end_date = _last_calendar_year()
-    weather = WeatherTools.get_weather_history.invoke({"points": points, "start_date": start_date, "end_date": end_date})
-    disasters = WeatherTools.get_disaster_history.invoke({"places": places})
-    alerts = WeatherTools.get_active_alerts.invoke({"points": points})
-    for n, (i, doc) in enumerate(pending):
-        risk = score_hub(weather[n], disasters[n], alerts[n])
-        complete = all(
-            isinstance(item, (WeatherHistory, DisasterHistory, ActiveAlerts))
-            for item in (weather[n], disasters[n], alerts[n])
-        )
-        if complete and risk.score is not None:
-            _save_score(doc, risk, now)
-        results[i] = _hub_score(doc, risk, now, refreshed=True)

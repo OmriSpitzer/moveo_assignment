@@ -1,35 +1,22 @@
-export type Role = 'user' | 'assistant'
+import type { AgentEvent, HistoryMessage, Hub } from '../types'
 
-export type HistoryMessage = { role: Role; content: string }
+/**
+ * Chat services with the agent
+ */
 
-export type Hub = { city: string; state_code: string; region: string }
-
+// Fetch hubs from the server
 export async function fetchHubs(): Promise<Hub[]> {
   const response = await fetch('/api/hubs')
   if (!response.ok) throw new Error(`Server responded with ${response.status}`)
   return (await response.json()) as Hub[]
 }
 
-export type Answer = {
-  timestamp: string
-  model: string
-  prompt: string
-  answer: string
-}
-
-export type AgentEvent =
-  | { type: 'tool_call'; id: string; name: string; args: Record<string, unknown> }
-  | { type: 'tool_result'; id: string; name: string; content: string }
-  | { type: 'answer'; answer: Answer }
-  | { type: 'error'; message: string }
-  | { type: 'done' }
-
+// Stream agent response
 export async function streamAgent(
-  messages: HistoryMessage[],
-  threadId: string,
-  onEvent: (event: AgentEvent) => void,
+  messages: HistoryMessage[], threadId: string, onEvent: (event: AgentEvent) => void,
   signal?: AbortSignal,
 ): Promise<void> {
+  // Send the chat history to the agent
   const response = await fetch('/api/agent/stream', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -40,8 +27,11 @@ export async function streamAgent(
     throw new Error(`Server responded with ${response.status}`)
   }
 
+  // Stream the agent response
   const reader = response.body.pipeThrough(new TextDecoderStream()).getReader()
   let buffer = ''
+
+  // Process the agent response
   for (;;) {
     const { value, done } = await reader.read()
     if (done) break

@@ -24,7 +24,7 @@ python -c "from fastapi.testclient import TestClient; from server import app; r 
 
 Expected: `200 text/event-stream`, then `data:` lines with `tool_call`, `tool_result`, `answer` (`"answer": "fake answer"`) and `done`.
 
-2. End to end: in `server/` run `python server.py`; in `weather-app/` run `npm run dev` and open http://localhost:5173. Click a suggestion. Expected: tool steps appear (amber while running, green when done), then the answer. A follow-up question in the same page sends the earlier turns as history.
+2. End to end: in `server/` run `python server.py`; in `weather-app/` run `npm run dev` and open http://localhost:5173. Click a suggestion. Expected: while a tool is running, one amber step shows the current tool and changes when the next tool starts. After the answer, that step is gone. A follow-up question in the same page sends the earlier turns as history.
 
 ## Real agent structured answer (2026-10-07 12:33)
 
@@ -137,7 +137,7 @@ Expected: `Weather, disasters, and active alerts for company hubs. A city that i
 Run from `server/`. No API or database.
 
 ```bash
-python -c "from datetime import date; from agent.scoring.score import score_hub; from agent.schema.tool_results import WeatherHistory, DisasterHistory, ActiveAlerts, Alert, ToolError; w=lambda rain: WeatherHistory(source='t', latitude=0, longitude=0, start_date='2025-01-01', end_date='2025-12-31', days=365, snow_days=0, freezing_days=0, heavy_rain_days=0, high_wind_days=0, snow_days_pct=0, freezing_days_pct=0, heavy_rain_days_pct=rain, high_wind_days_pct=0, total_snowfall_cm=0, heavy_rain_threshold_mm=25, high_wind_threshold_kmh=60, freezing_threshold_c=0); d=DisasterHistory(source='t', state='FL', county=None, since_year=date.today().year, total_disasters=4, by_incident_type={'Hurricane': 4}); a=ActiveAlerts(source='t', latitude=0, longitude=0, active_alert_count=1, alerts=[Alert(event='Hurricane Warning', severity='Extreme', headline=None, expires=None)]); calm=DisasterHistory(source='t', state='CO', county=None, since_year=2000, total_disasters=0, by_incident_type={}); none=ActiveAlerts(source='t', latitude=0, longitude=0, active_alert_count=0, alerts=[]); high=score_hub(w(10), d, a); low=score_hub(w(0), calm, none); partial=score_hub(ToolError(source='t', error='down'), d, a); print(high.score, low.score, partial.score, partial.excluded)"
+python -c "from datetime import date; from agent.scoring.score import ScoreMethod; from agent.schema.tool_results import WeatherHistory, DisasterHistory, ActiveAlerts, Alert, ToolError; w=lambda rain: WeatherHistory(source='t', latitude=0, longitude=0, start_date='2025-01-01', end_date='2025-12-31', days=365, snow_days=0, freezing_days=0, heavy_rain_days=0, high_wind_days=0, snow_days_pct=0, freezing_days_pct=0, heavy_rain_days_pct=rain, high_wind_days_pct=0, total_snowfall_cm=0, heavy_rain_threshold_mm=25, high_wind_threshold_kmh=60, freezing_threshold_c=0); d=DisasterHistory(source='t', state='FL', county=None, since_year=date.today().year, total_disasters=4, by_incident_type={'Hurricane': 4}); a=ActiveAlerts(source='t', latitude=0, longitude=0, active_alert_count=1, alerts=[Alert(event='Hurricane Warning', severity='Extreme', headline=None, expires=None)]); calm=DisasterHistory(source='t', state='CO', county=None, since_year=2000, total_disasters=0, by_incident_type={}); none=ActiveAlerts(source='t', latitude=0, longitude=0, active_alert_count=0, alerts=[]); high=ScoreMethod.score_hub(w(10), d, a); low=ScoreMethod.score_hub(w(0), calm, none); partial=ScoreMethod.score_hub(ToolError(source='t', error='down'), d, a); print(high.score, low.score, partial.score, partial.excluded)"
 ```
 
 Expected: `65.0 0.0 100.0 ['weather']`. The 65 is heavy rain at its cap (15) plus FEMA at its cap (40, 4 hurricanes in the current year) plus one Extreme alert (10). The partial score drops weather and scales disasters and alerts to 100. `high` factor points are Snow days 0, Freezing days 0, Heavy rain days 15, High wind days 0, FEMA disasters 40, Active alerts 10. Result 2026-10-07: passed.
@@ -227,7 +227,7 @@ Expected: `InMemorySaver 3 three 1 follow up`. Result 2026-10-07: passed.
 `decline_request` is not a tool. The prompt tells the model to answer a removal, a bulk clear, or an out-of-scope question itself, with no tool call. Run from `server/`.
 
 ```bash
-python -c "from agent.providers.ollama_agent import agent_tools; from agent.prompts.ollama_system_prompt import SYSTEM_PROMPT; names=[t.name for t in agent_tools()]; print('decline_request' not in names, 'do not call a tool' in SYSTEM_PROMPT, 'administrators' in SYSTEM_PROMPT)"
+python -c "from agent.providers.ollama_agent import agent_tools; from agent.prompts.ollama_system_prompt import SYSTEM_PROMPT; names=[t.name for t in agent_tools()]; print('decline_request' not in names, 'Do not call a tool' in SYSTEM_PROMPT, 'administrators' in SYSTEM_PROMPT)"
 ```
 
 Expected: `True True True`. Result 2026-10-07: passed.
@@ -257,7 +257,7 @@ Expected: `True True True`. Result 2026-10-07: passed.
 `score_hubs` is registered. A stored score newer than one day is returned unchanged and stays in score order. A score older than one day is refreshed. Load `.env` before importing. Run from `server/` (PowerShell), `$env:PYTHONIOENCODING = "utf-8"` first.
 
 ```bash
-python -c "from datetime import datetime, timedelta, timezone; from dotenv import load_dotenv; load_dotenv(); from agent.scoring.score import score_needs_refresh; from agent.prompts.ollama_system_prompt import SYSTEM_PROMPT; from agent.providers.ollama_agent import agent_tools; from agent.tools.db_tools import DbTools; from agent.tools.hub_tools import HubTools; from data.manager import DataManager; now=datetime.now(timezone.utc); print(score_needs_refresh(now - timedelta(hours=1), now), score_needs_refresh(now - timedelta(days=1, seconds=1), now), 'score_hubs' in [t.name for t in agent_tools()], 'Infer a 0-100' not in SYSTEM_PROMPT); factor=lambda n: {'name': n, 'points': 1.0, 'weight': 1.0, 'detail': 'test'}; keys=[DataManager.hub_key('Denver'), DataManager.hub_key('Miami')]; DbTools.set_fields({'city_key': keys[0]}, {'score': {'score': 80.0, 'factors': [factor('Snow days')], 'excluded': [], 'scored_at': now}}); DbTools.set_fields({'city_key': keys[1]}, {'score': {'score': 10.0, 'factors': [factor('Heavy rain days')], 'excluded': [], 'scored_at': now}}); cached=HubTools.score_hubs.invoke({'cities': ['Miami', 'Denver', 'Paris']}); print([type(x).__name__ for x in cached], [getattr(x, 'city', None) for x in cached], [getattr(x, 'score', None) for x in cached], [getattr(x, 'refreshed', None) for x in cached]); [DbTools.set_fields({'city_key': key}, {'score': None}) for key in keys]"
+python -c "from datetime import datetime, timedelta, timezone; from dotenv import load_dotenv; load_dotenv(); from agent.scoring.score import ScoreMethod; from agent.prompts.ollama_system_prompt import SYSTEM_PROMPT; from agent.providers.ollama_agent import agent_tools; from agent.tools.db_tools import DbTools; from agent.tools.hub_tools import HubTools; from data.manager import DataManager; now=datetime.now(timezone.utc); print(ScoreMethod.score_needs_refresh(now - timedelta(hours=1), now), ScoreMethod.score_needs_refresh(now - timedelta(days=1, seconds=1), now), 'score_hubs' in [t.name for t in agent_tools()], 'Infer a 0-100' not in SYSTEM_PROMPT); factor=lambda n: {'name': n, 'points': 1.0, 'weight': 1.0, 'detail': 'test'}; keys=[DataManager.hub_key('Denver'), DataManager.hub_key('Miami')]; DbTools.set_fields({'city_key': keys[0]}, {'score': {'score': 80.0, 'factors': [factor('Snow days')], 'excluded': [], 'scored_at': now}}); DbTools.set_fields({'city_key': keys[1]}, {'score': {'score': 10.0, 'factors': [factor('Heavy rain days')], 'excluded': [], 'scored_at': now}}); cached=HubTools.score_hubs.invoke({'cities': ['Miami', 'Denver', 'Paris']}); print([type(x).__name__ for x in cached], [getattr(x, 'city', None) for x in cached], [getattr(x, 'score', None) for x in cached], [getattr(x, 'refreshed', None) for x in cached]); [DbTools.set_fields({'city_key': key}, {'score': None}) for key in keys]"
 ```
 
 Expected: `False True True True` then `['HubScore', 'HubScore', 'ToolError'] ['Denver', 'Miami', None] [80.0, 10.0, None] [False, False, None]`. Paris is not a company hub. Denver stays ahead of Miami because 80 is higher, and neither score is refreshed. The command then clears those test scores. Result 2026-10-07: passed.
@@ -276,6 +276,207 @@ When the hub or the hazard is missing, the prompt says the whole reply is one qu
 
 ```bash
 python -c "from agent.prompts.ollama_system_prompt import SYSTEM_PROMPT; print('one follow-up question' in SYSTEM_PROMPT, 'Do not explain what data you have or do not have' in SYSTEM_PROMPT, 'does not ask a question' in SYSTEM_PROMPT)"
+```
+
+Expected: `True True True`. Result 2026-10-07: passed.
+
+## Current weather (2026-10-07 17:41)
+
+`get_current_weather` calls the Open-Meteo forecast current block and is registered. The prompt says to use it for the weather now, not alerts. Run from `server/` (PowerShell), `$env:PYTHONIOENCODING = "utf-8"` first.
+
+```bash
+python -c "from agent.tools.weather_tools import WeatherTools; from agent.providers.ollama_agent import agent_tools; from agent.prompts.ollama_system_prompt import SYSTEM_PROMPT; r=WeatherTools.get_current_weather.invoke({'points': [{'latitude': 41.88, 'longitude': -87.63}]}); print(type(r[0]).__name__, r[0].condition, r[0].temperature_c, 'get_current_weather' in [t.name for t in agent_tools()], 'Do not answer that question with get_active_alerts' in SYSTEM_PROMPT)"
+```
+
+Expected: `CurrentWeather`, a condition such as `Clear`, a temperature in °C, then `True True`. Result 2026-10-07: passed (`CurrentWeather Clear 16.4 True True`).
+
+## Answer built at each call (2026-10-07 18:09)
+
+`_to_answer` is gone. `stream` builds `Answer` once for a structured reply and once for plain text. Run from `server/`.
+
+```bash
+python -c "import inspect; from agent.providers.ollama_agent import OllamaAgent; src=inspect.getsource(OllamaAgent.stream); print(not hasattr(OllamaAgent, '_to_answer'), src.count('Answer(') == 2)"
+```
+
+Expected: `True True`. Result 2026-10-07: passed.
+
+## Tool prompt format (2026-10-07 18:16)
+
+Each tool in the system prompt is listed as a name with input and output. Run from `server/`.
+
+```bash
+python -c "from agent.prompts.ollama_system_prompt import SYSTEM_PROMPT; print('- list_hubs:' in SYSTEM_PROMPT, '\tinput:' in SYSTEM_PROMPT, '\toutput:' in SYSTEM_PROMPT, 'Do not answer that question with get_active_alerts' in SYSTEM_PROMPT)"
+```
+
+Expected: `True True True True`. Result 2026-10-07: passed.
+
+## Boundaries categories (2026-10-07 18:38)
+
+Weather, general, and out-of-scope questions are separate. The `score_hubs` field list stays on the tool. Run from `server/`.
+
+```bash
+python -c "from agent.prompts.ollama_system_prompt import SYSTEM_PROMPT; print('not a Boundaries question' not in SYSTEM_PROMPT, 'Score_hubs' not in SYSTEM_PROMPT, 'not a company hub' in SYSTEM_PROMPT, 'Do not call a tool' in SYSTEM_PROMPT, 'Do not list tool names' in SYSTEM_PROMPT, 'cannot add, update, or remove hubs' in SYSTEM_PROMPT, 'one follow-up question' in SYSTEM_PROMPT)"
+```
+
+Expected: `True True True True True True True`. Result 2026-10-07: passed.
+
+## Weather history tool text (2026-10-07 19:09)
+
+The `get_weather_history` description is one sentence. Run from `server/`.
+
+```bash
+python -c "from agent.tools.weather_tools import WeatherTools; d=WeatherTools.get_weather_history.description; print('high wind' in d, 'one call' in d, 'total_snowfall_cm' not in d, len(d) < 120)"
+```
+
+Expected: `True True True True`. Result 2026-10-07: passed.
+
+## Disaster, alert, and current weather tool text (2026-10-07 19:11)
+
+Those three descriptions are one sentence each. Run from `server/`.
+
+```bash
+python -c "from agent.tools.weather_tools import WeatherTools; ds=[t.description for t in WeatherTools.get_tools() if t.name != 'get_weather_history']; print(all('one call' in d and len(d) < 140 for d in ds), len(ds))"
+```
+
+Expected: `True 3`. Result 2026-10-07: passed.
+
+## Hub tool text (2026-10-07 19:21)
+
+`list_hubs`, `score_hubs`, and `set_hub` descriptions are one sentence each. Run from `server/`.
+
+```bash
+python -c "from agent.tools.hub_tools import HubTools; ds=[HubTools.list_hubs.description, HubTools.score_hubs.description, HubTools.set_hub.description]; print(all(len(d) < 160 for d in ds), len(ds))"
+```
+
+Expected: `True 3`. Result 2026-10-07: passed.
+
+## ScoreMethod (2026-10-07 19:25)
+
+Scoring is static methods on `ScoreMethod`. The same formula test as 16:21, with `ScoreMethod.score_hub`. Run from `server/`.
+
+```bash
+python -c "from agent.scoring.score import ScoreMethod; print(callable(ScoreMethod.score_hub), callable(ScoreMethod.score_needs_refresh))"
+```
+
+Expected: `True True`. The formula command in the 16:21 section still prints `65.0 0.0 100.0 ['weather']`. Result 2026-10-07: passed.
+
+## Request timeout and county match (2026-10-07 19:40)
+
+`URL_TIMEOUT` is passed as a number. A county matches the FEMA area name exactly, so Harris does not include Harrison and Maricopa does not include tribal areas. Run from `server/`.
+
+```bash
+python -c "from dotenv import load_dotenv; load_dotenv(); import requests; from agent.tools.weather_tools import WeatherTools; from agent.tools.location_tools import LocationTools; seen=[]; 
+class R:
+ def __init__(self, url): self.url=url
+ def raise_for_status(self): pass
+ def json(self):
+  if self.url and 'geocoding' in self.url: return {'results':[{'name':'Denver','latitude':39.7,'longitude':-104.9,'admin1':'Colorado','admin2':'Denver'}]}
+  return {'DisasterDeclarationsSummaries':[{'disasterNumber':1,'incidentType':'Flood','designatedArea':'Harris (County)'},{'disasterNumber':2,'incidentType':'Flood','designatedArea':'Harrison (County)'},{'disasterNumber':3,'incidentType':'Fire','designatedArea':'Maricopa (County)'},{'disasterNumber':4,'incidentType':'Fire','designatedArea':'Salt River Pima-Maricopa Indian Community'},{'disasterNumber':5,'incidentType':'Fire','designatedArea':'Maricopa Indian Reservation (Ak Chin)'}]}
+def fake(url, params=None, timeout=None, headers=None):
+ seen.append(type(timeout).__name__); return R(url)
+requests.get=fake
+h=WeatherTools._disaster_one({'state_code':'TX','county':'Harris County'},2000)
+m=WeatherTools._disaster_one({'state_code':'AZ','county':'Maricopa'},2000)
+loc=LocationTools._one({'city':'Denver','state_code':'CO'})
+print(seen==['float','float','float'], h.total_disasters, m.total_disasters, type(loc).__name__, loc.state_code)"
+```
+
+Expected: `True 1 1 Location CO`. Result 2026-10-07: passed.
+
+## Server import with URL_TIMEOUT (2026-10-07 19:46)
+
+`URL_TIMEOUT` is loaded from `.env` before the weather and location tools parse it, so `python server.py` can import those modules. Run from `server/`.
+
+```bash
+python -c "import server; from agent.tools.weather_tools import URL_TIMEOUT; print(type(URL_TIMEOUT).__name__, URL_TIMEOUT)"
+```
+
+Expected: `float 20.0`. Result 2026-10-07: passed.
+
+## Evaluation set (2026-10-07 19:50)
+
+Six cases in `server/eval/cases.py`. The grader checks tools, tool arguments, and answer text without calling the model. Run from `server/`.
+
+```bash
+python -c "from eval.check import grade_turn; from eval.cases import CASES; ok=grade_turn({'tools':['get_weather_history'],'forbid':['score_hubs'],'args':{'get_weather_history':['2025']},'pattern':r'\d+(\.\d+)?\s*(%|percent)','lacks':['sources:']},[{'type':'tool_call','name':'get_weather_history','args':{'start_date':'2025-01-01'}},{'type':'answer','answer':{'answer':'12.1% of days had snow.'}}]); bad=grade_turn({'no_tools':True,'question':True},[{'type':'tool_call','name':'list_hubs'},{'type':'answer','answer':{'answer':'Denver had snow.'}}]); print(ok, bad, len(CASES), len({c['name'] for c in CASES})==len(CASES))"
+```
+
+Expected: `[] ['called list_hubs', 'answer is not a question'] 6 True`.
+
+The live run needs Ollama settings in `server/.env` and MongoDB. It calls the model and the public APIs.
+
+```bash
+python -m eval.run
+```
+
+Expected: one `pass` line per case, then `6/6 passed`, exit status 0. `python -m eval.run snow` runs only cases whose name contains `snow`. Result 2026-10-07: `5/6 passed`. `which hub` ("What is the hurricane risk?") called `list_hubs` and `get_disaster_history` and ranked the hubs instead of asking which hub.
+
+## Not a hub wording (2026-10-07 19:54)
+
+`not a hub` accepts "not a company hub" or "not one of our company hubs". A `list_hubs` call is allowed. Run from `server/`.
+
+```bash
+python -c "from eval.check import grade_turn; from eval.cases import CASES; turn=next(c for c in CASES if c['name']=='not a hub')['turns'][0]; events=[{'type':'tool_call','name':'list_hubs'},{'type':'answer','answer':{'answer':'Paris is not one of our company hubs.'}}]; print(grade_turn(turn, events))"
+```
+
+Expected: `[]`. Result 2026-10-07: passed.
+
+## Missing hub asks which hub (2026-10-07 19:57)
+
+A question that names no hub does not call a tool. The reply is one question asking which hub. Run from `server/`.
+
+```bash
+python -c "from agent.prompts.ollama_system_prompt import SYSTEM_PROMPT; print('does not name a hub' in SYSTEM_PROMPT, 'including list_hubs' in SYSTEM_PROMPT, 'question mark' in SYSTEM_PROMPT, 'Do not answer for every hub' in SYSTEM_PROMPT)"
+```
+
+Expected: `True True True True`. Result 2026-10-07: passed. Live `python -m eval.run "which hub"` passed: no tools, and the reply asked which hub.
+
+## Weather app modules (2026-10-07 20:06)
+
+`App.tsx` composes the header, chat, message card, and hub list. Types are in `src/types`. The hub fetch, agent stream, and tool-step update are in `src/services`. Run from `weather-app/`.
+
+```bash
+npx tsc -p tsconfig.app.json --noEmit
+```
+
+Expected: exit status 0. Result 2026-10-07: passed.
+
+## Suggestions display (2026-10-07 20:40)
+
+The empty chat shows suggestion buttons from `SuggestionsDisplay`. Run from `weather-app/`.
+
+```bash
+npx tsc -p tsconfig.app.json --noEmit
+```
+
+Expected: exit status 0.
+
+## Selected hub stays in the dropdown (2026-10-07 20:44)
+
+Choosing a hub leaves that city selected and tints the dropdown. The input text is unchanged. Sending with an empty input does nothing. Sending text that does not already name the hub adds the hub to the question. Run from `weather-app/`.
+
+```bash
+npx tsc -p tsconfig.app.json --noEmit
+```
+
+Expected: exit status 0.
+
+## Friendly hub suggestions (2026-10-07 20:50)
+
+Suggestion buttons name hubs from the loaded list. An empty hub list shows no buttons. Run from `weather-app/`.
+
+```bash
+npx tsc -p tsconfig.app.json --noEmit
+```
+
+Expected: exit status 0. Result 2026-10-07: passed.
+
+## Project docs (2026-10-07 20:55)
+
+The root README, the weather-app README, and `docs/architecture.md` describe the same system. Run from the repository root.
+
+```bash
+python -c "from pathlib import Path; root=Path('README.md').read_text(encoding='utf-8'); web=Path('weather-app/README.md').read_text(encoding='utf-8'); arch=Path('docs/architecture.md').read_text(encoding='utf-8'); print('FastAPI' in root, 'Vite' in web, 'browser' in arch and 'ScoreMethod' in arch and '## Components' in arch)"
 ```
 
 Expected: `True True True`. Result 2026-10-07: passed.

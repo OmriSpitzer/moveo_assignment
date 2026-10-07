@@ -2,27 +2,16 @@ from dataclasses import dataclass
 
 """
     Result dataclasses returned by the agent tools
-
-    Classes:
-        ToolError: a tool call failed
-        Location: geocoded US city
-        WeatherHistory: summarized daily historical weather
-        DisasterHistory: FEMA disaster declarations counted by incident type
-        Alert: a single active NWS alert
-        ActiveAlerts: active NWS alerts for a location
-        FactorScore: one static factor's points inside a hub score
-        RiskScore: 0-100 score, factor points, and sections left out
-        HubScore: stored 0-100 score for one hub, with the time it was calculated
-        HubRisk: weather, disasters, alerts, and score for one hub city
-        Hub: a company hub from the hubs collection
 """
 
+# Tool error answer class
 @dataclass(frozen=True)
 class ToolError:
     source: str
     error: str
 
 
+# Location answer class
 @dataclass(frozen=True)
 class Location:
     source: str
@@ -34,6 +23,7 @@ class Location:
     county: str | None
 
 
+# Weather history answer class
 @dataclass(frozen=True)
 class WeatherHistory:
     source: str
@@ -56,6 +46,7 @@ class WeatherHistory:
     freezing_threshold_c: float
 
 
+# Disaster history answer class
 @dataclass(frozen=True)
 class DisasterHistory:
     source: str
@@ -66,6 +57,7 @@ class DisasterHistory:
     by_incident_type: dict[str, int]
 
 
+# Alert answer class
 @dataclass(frozen=True)
 class Alert:
     event: str | None
@@ -74,6 +66,7 @@ class Alert:
     expires: str | None
 
 
+# Active alerts answer class
 @dataclass(frozen=True)
 class ActiveAlerts:
     source: str
@@ -83,6 +76,22 @@ class ActiveAlerts:
     alerts: list[Alert]
 
 
+# Current weather answer class
+@dataclass(frozen=True)
+class CurrentWeather:
+    source: str
+    latitude: float
+    longitude: float
+    time: str
+    temperature_c: float
+    precipitation_mm: float
+    wind_speed_kmh: float
+    wind_gusts_kmh: float
+    weather_code: int
+    condition: str
+
+
+# Factor score answer class
 @dataclass(frozen=True)
 class FactorScore:
     name: str
@@ -91,6 +100,7 @@ class FactorScore:
     detail: str
 
 
+# Risk score answer class
 @dataclass(frozen=True)
 class RiskScore:
     score: float | None
@@ -98,6 +108,7 @@ class RiskScore:
     excluded: list[str]
 
 
+# Hub score answer class
 @dataclass(frozen=True)
 class HubScore:
     city: str
@@ -108,20 +119,9 @@ class HubScore:
     excluded: list[str]
     scored_at: str
     refreshed: bool
+    
 
-
-@dataclass(frozen=True)
-class HubRisk:
-    city: str
-    state_code: str
-    region: str
-    weather: WeatherHistory | ToolError | None
-    disasters: DisasterHistory | ToolError | None
-    alerts: ActiveAlerts | ToolError | None
-    data_as_of: dict[str, str]
-    score: RiskScore | None = None
-
-
+# Hub answer class
 @dataclass(frozen=True)
 class Hub:
     city: str

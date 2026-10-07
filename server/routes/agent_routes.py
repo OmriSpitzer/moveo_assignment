@@ -6,7 +6,6 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from agent.agent import Agent
 from agent.tools.hub_tools import HubTools
-from dataclasses import dataclass
 
 """
     Agent routes across the API.
