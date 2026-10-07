@@ -2,6 +2,7 @@ import { useEffect, useState, type SubmitEvent, type KeyboardEvent } from 'react
 import { ChatDisplay } from './components/ChatDisplay'
 import { Header } from './components/Header'
 import HubsDropUp from './components/HubsDropUp'
+import { VoiceInput } from './components/VoiceInput'
 import { fetchHubs, streamAgent } from './services/api'
 import { applyEvent } from './services/chat'
 import type { ChatMessage, Hub } from './types'
@@ -83,6 +84,13 @@ const App = () => {
     void send(question)
   }
 
+  // Insert the transcript into the input
+  const insertTranscript = (spoken: string) => {
+    const text = spoken.trim()
+    if (!text) return
+    setInput((prev) => (prev.trim() ? `${prev.trimEnd()} ${text}` : text))
+  }
+
   // Handle form submission
   const onSubmit = (e: SubmitEvent) => {
     e.preventDefault()
@@ -128,6 +136,8 @@ const App = () => {
           >
             {isStreaming ? 'Working…' : 'Send'}
           </button>
+
+          <VoiceInput disabled={isStreaming} onTranscript={insertTranscript} />
         </div>
       </form>
     </div>

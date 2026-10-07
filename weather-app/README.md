@@ -27,6 +27,7 @@ src/components/ChatDisplay.tsx      message list and empty state
 src/components/SuggestionsDisplay.tsx
 src/components/MessageCard.tsx      one turn, including the live tool step
 src/components/HubsDropUp.tsx       hub picker
+src/components/VoiceInput.tsx       English microphone, pause ends the take
 src/services/api.ts                 GET /api/hubs, POST /api/agent/stream
 src/services/chat.ts                stream events become the visible tool step
 src/types/                          hub, chat, and agent event types
@@ -38,4 +39,5 @@ src/types/                          hub, chat, and agent event types
 - The hub picker keeps the chosen city and tints its background. The city is not written into the text box.
 - Send does nothing when the text box is empty.
 - If the typed question does not already name the chosen hub, that hub is added to the message sent to the agent.
+- The Mic button opens English speech recognition. A short pause inserts the transcript into the text box. Send is still a separate click.
 - While a tool is running, the assistant card shows that step. The step disappears when the answer arrives.

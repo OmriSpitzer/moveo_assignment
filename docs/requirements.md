@@ -13,7 +13,7 @@
 
 Bonus, only after every item above is done:
 
-- [ ] Voice input
+- [x] Voice input
 - [ ] Scheduled or webhook alert when a hub's risk score changes
 - [ ] Deployed URL
 
@@ -101,6 +101,7 @@ Bonus, only after every item above is done:
 | 20:40 | Empty-chat suggestion buttons moved into `SuggestionsDisplay`. `ChatDisplay` renders it when there are no messages. Test added in `docs/tests.md` |
 | 20:44 | Hub dropdown keeps the chosen hub and tints its background. The hub name is not written into the input. An empty input is not sent. If the typed text does not name the chosen hub, that hub is added to the question sent to the agent. Test added in `docs/tests.md` |
 | 20:50 | Empty-chat suggestions are friendlier questions built from the loaded hubs. No suggestion buttons when the hub list is empty. Test added in `docs/tests.md` |
-| 20:55 | Root and `weather-app` READMEs rewritten. `docs/architecture.md` now describes the whole system: browser, API, agent, data, and score. Test added in `docs/tests.md` |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| 20:55 | Root and `weather-app` READMEs rewritten. `docs/architecture.md` now describes the whole system: browser, API, agent, data, and score. Test added in `docs/tests.md` |
+| 21:00 | Voice input: `VoiceInput` beside Send. English speech ends after a short pause and the transcript is inserted into the text box. Send stays a separate click. Test added in `docs/tests.md` |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 
 

@@ -480,3 +480,13 @@ python -c "from pathlib import Path; root=Path('README.md').read_text(encoding='
 ```
 
 Expected: `True True True`. Result 2026-10-07: passed.
+
+## Voice input (2026-10-07 21:00)
+
+`VoiceInput` sits beside Send. It listens in English and, after a short pause, inserts the transcript into the text box. The message is not sent until Send. Run from `weather-app/`.
+
+```bash
+npx tsc -p tsconfig.app.json --noEmit
+```
+
+Expected: exit status 0. Result 2026-10-07: passed.
