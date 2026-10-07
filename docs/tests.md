@@ -500,3 +500,13 @@ python -c "from pathlib import Path; t=Path('Dockerfile').read_text(encoding='ut
 ```
 
 Expected: `True True True True True`. Result 2026-10-07: passed.
+
+## Atlas TLS from the API image (2026-10-07 21:23)
+
+The image installs CA certificates, and the Mongo client uses `certifi`. Run from the repository root.
+
+```bash
+python -c "from pathlib import Path; d=Path('Dockerfile').read_text(encoding='utf-8'); m=Path('server/data/manager.py').read_text(encoding='utf-8'); print('ca-certificates' in d, 'tlsCAFile=certifi.where()' in m)"
+```
+
+Expected: `True True`. Result 2026-10-07: passed.

@@ -67,7 +67,7 @@ docker-compose.yaml     runs the API and reads server/.env
 
 ## Data storage
 
-MongoDB (`server/data/manager.py`), chosen because the app will run on the internet with a hosted database. One collection, `hubs`, one document per hub:
+MongoDB (`server/data/manager.py`), chosen because the app will run on the internet with a hosted database. The API image installs CA certificates, and the client passes `certifi` as the TLS CA file so the Atlas handshake succeeds from that image. One collection, `hubs`, one document per hub:
 
 - `city`, `city_key` (unique, lowercase), `state_code`, `region`, optional `county` override, `created_at`. The seed includes `location` (latitude, longitude, county) for every hub. Existing hub documents missing coordinates get that seed location on startup.
 - The agent does not add or update hubs. It calls `get_location` only when `list_hubs` did not already return coordinates. `get_location` takes the city list and resolves every city in parallel inside that one call. It then calls `get_weather_history`, `get_disaster_history`, `get_active_alerts`, and `get_current_weather` only for the sections a question needs. `get_current_weather` is the Open-Meteo forecast current block, used when the question asks what the weather is now. Each of those tools takes a list and fetches every place in that one call.
