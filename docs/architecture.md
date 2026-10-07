@@ -14,7 +14,7 @@ browser
 
 ## Components
 
-**Web client** (`weather-app`). `App.tsx` holds the session and the composer. `Header`, `ChatDisplay`, `SuggestionsDisplay`, `MessageCard`, `HubsDropUp`, and `VoiceInput` are the screen. `VoiceInput` sits beside Send. A click opens the microphone for English. A pause of about a second ends the recording and inserts the transcript into the text box. The user sends that text with Send. `services/api.ts` calls `GET /api/hubs` and `POST /api/agent/stream`. `services/chat.ts` turns each stream event into the tool step on the assistant card. Types live in `types`.
+**Web client** (`weather-app`). `App.tsx` holds the session and the composer. `Header`, `ChatDisplay`, `SuggestionsDisplay`, `MessageCard`, `HubsDropUp`, and `VoiceInput` are the screen. `VoiceInput` sits beside Send. A click opens the microphone for English. Recognized words appear in the text box as they are heard, after any text already there. A pause of about ten seconds ends the recording and leaves that text in the box. The user sends that text with Send. `services/api.ts` calls `GET /api/hubs` and `POST /api/agent/stream`. `services/chat.ts` turns each stream event into the tool step on the assistant card. Types live in `types`.
 
 `ChatDisplay` shows `SuggestionsDisplay` when the chat is empty. Those questions are built from the loaded hubs, and none are shown when the hub list is empty. `HubsDropUp` keeps the chosen hub and uses a tinted background. Choosing a hub does not write it into the input. A send with no input text is ignored. When the typed text does not already name the chosen hub, that hub is added to the question sent to the agent.
 
@@ -48,6 +48,13 @@ server/
   agent/schema/             answer and tool-result models
   data/                     MongoDB manager and hub seed
   eval/                     cases, grader, runner
+  tests/                    unit tests and run.py (see docs/test.md)
+    agent/
+    data/
+    eval/
+    prompts/
+    scoring/
+    tools/
 weather-app/
   src/App.tsx
   src/components/
@@ -56,7 +63,7 @@ weather-app/
 docs/
   requirements.md
   architecture.md
-  tests.md
+  test.md
 Dockerfile              API image, listens on port 8000
 docker-compose.yaml     runs the API and reads server/.env
 ```

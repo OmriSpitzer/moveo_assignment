@@ -1,4 +1,4 @@
-import { useEffect, useState, type SubmitEvent, type KeyboardEvent } from 'react'
+import { useEffect, useRef, useState, type SubmitEvent, type KeyboardEvent } from 'react'
 import { ChatDisplay } from './components/ChatDisplay'
 import { Header } from './components/Header'
 import HubsDropUp from './components/HubsDropUp'
@@ -20,6 +20,9 @@ const App = () => {
   const [hubs, setHubs] = useState<Hub[]>([])                       // Hubs
   const [hubsError, setHubsError] = useState(false)                 // Hubs error
   const [selectedHub, setSelectedHub] = useState('')                // Selected hub
+  const inputRef = useRef(input)                                    // Latest input text
+  const speechBase = useRef<string | null>(null)                    // Text before the mic opened
+  inputRef.current = input
 
   // Retrieve hubs from server
   const loadHubs = async () => {
@@ -59,6 +62,7 @@ const App = () => {
     ])
 
     // Clear the input and set the streaming state to true
+    speechBase.current = null
     setInput('')
     setIsStreaming(true)
 
@@ -84,11 +88,22 @@ const App = () => {
     void send(question)
   }
 
+  // Keep the text already in the box and show words as they are heard
+  const beginSpeech = () => {
+    speechBase.current = inputRef.current
+  }
+
+  const applySpoken = (spoken: string) => {
+    const base = speechBase.current
+    if (base === null) return
+    const text = spoken.trim()
+    setInput(text ? (base.trim() ? `${base.trimEnd()} ${text}` : text) : base)
+  }
+
   // Insert the transcript into the input
   const insertTranscript = (spoken: string) => {
-    const text = spoken.trim()
-    if (!text) return
-    setInput((prev) => (prev.trim() ? `${prev.trimEnd()} ${text}` : text))
+    applySpoken(spoken)
+    speechBase.current = null
   }
 
   // Handle form submission
@@ -106,7 +121,7 @@ const App = () => {
   }
 
   return (
-    <div className="flex h-svh flex-col bg-slate-50 text-slate-800">
+    <div className="flex h-svh flex-col bg-slate-200 text-slate-800">
       {/* Header */}
       <Header />
 
@@ -137,7 +152,12 @@ const App = () => {
             {isStreaming ? 'Working…' : 'Send'}
           </button>
 
-          <VoiceInput disabled={isStreaming} onTranscript={insertTranscript} />
+          <VoiceInput
+            disabled={isStreaming}
+            onBegin={beginSpeech}
+            onPartial={applySpoken}
+            onTranscript={insertTranscript}
+          />
         </div>
       </form>
     </div>

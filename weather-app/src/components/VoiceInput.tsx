@@ -18,9 +18,13 @@ function englishRecognizer(): EnglishRecognizerCtor | null {
  */
 export const VoiceInput = ({
   disabled,
+  onBegin,
+  onPartial,
   onTranscript,
 }: {
   disabled: boolean
+  onBegin: () => void
+  onPartial: (text: string) => void
   onTranscript: (text: string) => void
 }) => {
   const [listening, setListening] = useState(false)
@@ -28,8 +32,12 @@ export const VoiceInput = ({
   const recognitionRef = useRef<EnglishRecognizer | null>(null)
   const pauseRef = useRef<number | null>(null)
   const transcriptRef = useRef('')
+  const onBeginRef = useRef(onBegin)
+  const onPartialRef = useRef(onPartial)
   const onTranscriptRef = useRef(onTranscript)
   const aliveRef = useRef(true)
+  onBeginRef.current = onBegin
+  onPartialRef.current = onPartial
   onTranscriptRef.current = onTranscript
 
   useEffect(() => {
@@ -42,6 +50,12 @@ export const VoiceInput = ({
     }
   }, [])
 
+  useEffect(() => {
+    if (!disabled) return
+    if (pauseRef.current !== null) window.clearTimeout(pauseRef.current)
+    recognitionRef.current?.stop()
+  }, [disabled])
+
   const start = () => {
     const Ctor = englishRecognizer()
     if (!Ctor) return
@@ -50,11 +64,14 @@ export const VoiceInput = ({
     recognition.interimResults = true
     recognition.continuous = true
     transcriptRef.current = ''
+    onBeginRef.current()
     recognition.onresult = (event) => {
       transcriptRef.current = Array.from(event.results)
         .map((result) => result[0]?.transcript ?? '')
         .join(' ')
+        .replace(/\s+/g, ' ')
         .trim()
+      if (aliveRef.current) onPartialRef.current(transcriptRef.current)
       if (pauseRef.current !== null) window.clearTimeout(pauseRef.current)
       pauseRef.current = window.setTimeout(() => recognition.stop(), PAUSE_MS)
     }
@@ -68,7 +85,7 @@ export const VoiceInput = ({
       recognitionRef.current = null
       const spoken = transcriptRef.current.trim()
       transcriptRef.current = ''
-      if (aliveRef.current && spoken) onTranscriptRef.current(spoken)
+      if (aliveRef.current) onTranscriptRef.current(spoken)
     }
     recognitionRef.current = recognition
     setListening(true)

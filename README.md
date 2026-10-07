@@ -42,13 +42,13 @@ The image serves the chat at `/` and the API under `/api`, on port 8000. Compose
 ```
 server/         API, agent, tools, scoring, evaluation
 weather-app/    chat UI
-docs/           requirements, architecture, tests
+docs/           requirements, architecture, unit tests
 ```
 
 ## Docs
 
 - [Architecture](docs/architecture.md)
 - [Requirements](docs/requirements.md)
-- [Tests](docs/tests.md)
+- [Tests](docs/test.md)
 
 From `server/`, `python -m eval.run` grades a small set of questions against the live agent.
