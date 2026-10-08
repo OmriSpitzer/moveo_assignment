@@ -1,5 +1,9 @@
 import sys
 import uuid
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 from langchain_core.messages import HumanMessage
 from eval.cases import CASES
 from eval.check import grade_turn

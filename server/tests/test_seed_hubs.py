@@ -8,6 +8,8 @@ class SeedHubTests(unittest.TestCase):
         new_york = next(hub for hub in SEED_HUBS if hub["city"] == "New York")
         denver = next(hub for hub in SEED_HUBS if hub["city"] == "Denver")
         self.assertEqual(len(SEED_HUBS), 14)
+        self.assertTrue(all(hub["score"] == 0 for hub in SEED_HUBS))
+        self.assertTrue(all("scored_at" not in hub for hub in SEED_HUBS))
         self.assertTrue(all("latitude" in hub["location"] and "longitude" in hub["location"] for hub in SEED_HUBS))
         self.assertEqual(new_york["location"]["county"], "New York")
         self.assertEqual(denver["location"]["state_code"], "CO")

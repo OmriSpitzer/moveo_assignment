@@ -73,7 +73,7 @@ flowchart TD
 
 ## Components
 
-**Web client** (`weather-app`). `App.tsx` holds the session and the composer. The screen is `Header`, `ChatDisplay`, `SuggestionsDisplay`, `MessageCard`, `HubsDropUp`, and `VoiceInput`. Suggestions appear only on an empty chat that has hubs. The hub picker keeps the chosen hub and does not write it into the input. An empty send is ignored. If the typed text does not name the chosen hub, that hub is added to the question. Voice writes English words into the box as they are heard, sends after a pause of about ten seconds, and a click while listening stops without sending.
+**Web client** (`weather-app`). `App.tsx` holds the session and the composer. The screen is `Header`, `ChatDisplay`, `SuggestionsDisplay`, `MessageCard`, `HubsDropUp`, `VoiceInput`, and `ScoreAlerts`. Suggestions appear only on an empty chat that has hubs. The hub picker keeps the chosen hub and does not write it into the input. An empty send is ignored. If the typed text does not name the chosen hub, that hub is added to the question. Voice writes English words into the box as they are heard, sends after a pause of about ten seconds, and a click while listening stops without sending. A hub score that changed arrives as a `score_alert` event and shows as a yellow notice beside the chat. That list scrolls on its own, and each notice leaves after a few seconds. The chat position stays where it is.
 
 ```
 services/api.ts    GET /api/hubs, POST /api/agent/stream
@@ -94,6 +94,7 @@ POST /api/agent/stream  Server-Sent Events for one turn
 ```
 tool_call
 tool_result
+score_alert
 answer
 error
 done
@@ -151,13 +152,13 @@ region
 county            optional override
 location          latitude, longitude, county
 created_at
-score             written by score_hubs
-scored_at
+score             seeded at 0, then written by set_hub
+scored_at         absent on a seed hub; set when the score is first written. Older than one day is recalculated
 ```
 
 ## Scoring
 
-`ScoreMethod.score_hub` in `agent/scoring/score.py` turns weather, FEMA history, and active alerts into a 0-100 `RiskScore`. A section that failed is omitted and the remaining weights are scaled to 100. `score_hubs` calls it when a question ranks or compares hubs. A score older than one day is recalculated. A newer score is reused.
+`ScoreMethod.score_hub` in `agent/scoring/score.py` turns weather, FEMA history, and active alerts into a 0-100 `RiskScore`. A section that failed is omitted and the remaining weights are scaled to 100. Seed hubs start at score 0 with no `scored_at`, so the first scoring run always recalculates them. `score_hubs` calls `ScoreMethod.score_hub` when a question ranks or compares hubs. A missing timestamp, a score with no factor points, or a score older than one day, is recalculated and written through `set_hub`, which stores the number, the factor points, and a new `scored_at`. A current score that already has factor points is reused, so a why question can explain those points. A number that changed is sent to the chat as `score_alert`.
 
 ```
 weather    50    snow, freezing, heavy rain, high wind

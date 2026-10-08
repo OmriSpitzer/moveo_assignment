@@ -12,7 +12,7 @@ from agent.prompts.ollama_system_prompt import SYSTEM_PROMPT
 from agent.providers.base_agent import BaseAgent
 import uuid
 from agent.schema.answer import Answer, ERROR_ANSWER, LLMAnswer
-from agent.tools.hub_tools import HubTools
+from agent.tools.hub_tools import HubTools, drain_score_alerts
 from agent.tools.location_tools import LocationTools
 from agent.tools.weather_tools import WeatherTools
 
@@ -121,6 +121,8 @@ class OllamaAgent(BaseAgent):
                                 "name": message.name,
                                 "content": str(message.content)[:500],
                             }
+                            if message.name == "score_hubs":
+                                yield from drain_score_alerts()
 
                         elif message.status == "error" or "error" in str(message.content).lower():
                             failure_reason = f"invalid structured answer: {message.content}"

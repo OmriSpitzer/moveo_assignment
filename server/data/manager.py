@@ -48,10 +48,24 @@ class DataManager:
         now = datetime.now(timezone.utc)
         if hubs.estimated_document_count() == 0:
             hubs.insert_many(
-                [{**hub, "city_key": cls.hub_key(hub["city"]), "created_at": now, "updated_at": {"location": now}} for hub in SEED_HUBS]
+                [{
+                    **hub,
+                    "city_key": cls.hub_key(hub["city"]),
+                    "created_at": now,
+                    "updated_at": {"location": now},
+                } for hub in SEED_HUBS]
             )
         for hub in SEED_HUBS:
+            key = cls.hub_key(hub["city"])
             hubs.update_one(
-                {"city_key": cls.hub_key(hub["city"]), "location.latitude": {"$exists": False}},
+                {"city_key": key, "location.latitude": {"$exists": False}},
                 {"$set": {"location": hub["location"], "updated_at.location": now}},
+            )
+            hubs.update_one(
+                {"city_key": key, "score": {"$exists": False}},
+                {"$set": {"score": 0}},
+            )
+            hubs.update_one(
+                {"city_key": key, "score": 0, "$expr": {"$eq": ["$scored_at", "$created_at"]}},
+                {"$unset": {"scored_at": ""}},
             )

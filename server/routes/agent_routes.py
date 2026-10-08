@@ -22,7 +22,7 @@ from agent.tools.hub_tools import HubTools
 router = APIRouter()
 
 # create the agent
-agent = Agent(is_fake=True)
+agent = Agent(is_fake=False)
 
 # Chat message model
 class ChatMessage(BaseModel):

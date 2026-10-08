@@ -14,7 +14,7 @@
 Bonus, only after every item above is done:
 
 - [x] Voice input
-- [ ] Scheduled or webhook alert when a hub's risk score changes
+- [x] Scheduled or webhook alert when a hub's risk score changes
 - [x] Deployed URL
 
 
@@ -133,5 +133,11 @@ Bonus, only after every item above is done:
 | 08:42 | Technology lines under those titles are pills with the name and the version pinned in the repo. |
 | 08:45 | `weather-app/README.md` has the same pills for the chat stack. |
 | 08:48 | Refreshed `docs/conversations` to 22 sessions and linked that folder from the other docs. |
+| 08:57 | Seed scores start at 0. A score older than a day is saved through `set_hub`, and a change shows as a yellow alert beside the chat. |
+| 09:05 | Seed hubs have no `scored_at`, so the first scoring run always recalculates them. |
+| 09:13 | An explain question for one hub states the score, then one simple bullet for each factor that added points. |
+| 09:17 | A why question explains the stored factor points. A score saved without those points is recalculated. |
+| 09:27 | `python eval\run.py` from `server/` imports `eval.cases` instead of `server.eval`. |
+| 09:31 | Refreshed `docs/conversations` so this session includes the later turns. |
 
 

@@ -126,4 +126,128 @@ suggest improvements
 
 I'll refresh the exported chats from the latest Cursor sessions, then bring the other markdown docs in line with that and note what is worth improving.
 
+One session is missing from the export, and the later chats are only partly saved. I’ll regenerate `docs/conversations` and point the other docs at it.
+
+`docs/conversations` now has **22** sessions, including the architecture chat from 08:19 and the later turns of this chat. The index is `docs/conversations/README.md`. The root README, architecture doc, agent structure doc, weather-app README, test doc, and `AGENTS.md` all link to that folder.
+
+This chat’s file is `21-2026-10-08-0813-export-all-conversations-had-agents-this.md`. It includes the request you just sent. The reply you are reading will not be in that file until the session is exported again.
+
+**Improvements worth making**
+
+- **Follow-ups die on restart.** The agent keeps the thread in process memory. A new server process, including a redeploy, starts a blank chat. For the interview, stay on one running process.
+- **`set_hub` is unused.** It is written in `hub_tools.py` and is not registered. The model cannot add or change hubs. Delete it, or the next reader will think it is live.
+- **The score-change alert is the open bonus.** Everything else on the requirements list is done.
+- **Two pill versions are the client libraries, not the servers.** Ollama `1.1.0` is `langchain-ollama`. MongoDB `4.17.0` is PyMongo. The Atlas server version is not in the repo.
+- **`weather-app/README.md` still names React Compiler in the stack line**, and the pills under the title do not. Put the compiler pill back, or take it out of that line.
+- **The weather-API session still names the Atlas user and cluster.** The password fragment is redacted. Change that database password if you have not already, before this folder is committed.
+
+Tools: `Glob`, `Read`, `Grep`, `Shell`, `Write`, `StrReplace`
+
+## You
+
+add a score in the db seed (init 0), when agent scores the hubs he updates it useing the set_hub. add also a timestamp so more than a day must be changed. if changed, send an alert to client, and that will pop up as yellow alerts next to the chatmessage (timed alerts that vanish). make it scrollable like the chat, but shouldn't change the current view (just beside)
+
+## Agent
+
+The score should start at 0 in the seed, get updated through `set_hub` when it is older than a day, and a change should show as a yellow alert beside the chat. I’ll read the scoring path and the chat layout first.
+
+Scores will start at 0, and a refresh older than a day will be written through `set_hub`. A change will show as a yellow alert beside the chat, on its own scroller, and then disappear.
+
+A hub score now starts at **0**. If `scored_at` is more than a day old, `score_hubs` recalculates it and saves the new number through `set_hub`, along with a new timestamp. When the number actually changes, the chat gets a `score_alert`.
+
+That notice shows up in a yellow list on the right of the chat. The list scrolls by itself, so the messages stay where they are. Each notice disappears after eight seconds.
+
+A score written today, including a fresh seed of 0, is left alone until it is older than a day. Hubs that already have a score in the database keep it. Only hubs with no score are filled in as 0.
+
+`python server/tests/run.py` passed, 21 tests. The TypeScript check passed. I could not open the app in a browser, so the yellow list was not clicked through against a live score change.
+
+Tools: `Read`, `Grep`, `Glob`, `StrReplace`, `Write`, `Shell`, `GetDynamicTools`
+
+## You
+
+i want a seed to have no scored at so that defintley will change at first acounter
+
+## Agent
+
+Seed hubs should have a score of 0 and no `scored_at`, so the first time a hub is scored it is always recalculated. I'll check the seed and the refresh check.
+
+The seed list already stores score 0. Startup was still writing `scored_at`, which blocked the first recalculation. I'll stop writing that timestamp so the first scoring run always updates the hub.
+
+Seed hubs stay at score **0** and no longer get a `scored_at` time. The first time `score_hubs` reads one, that missing time forces a recalculation, `set_hub` writes the new score and the timestamp, and a change still shows as a yellow alert.
+
+A hub that was already given a timestamp at startup, while its score was still 0, has that timestamp removed the next time the server starts. A score that was already recalculated keeps its timestamp and is left alone until it is more than a day old.
+
+Tools: `Read`, `Grep`, `StrReplace`, `Shell`
+
+## You
+
+Chicago's current weather risk score is 32.4 out of 100.
+- No active alerts are contributing to the score.
+
+when asking one explain in detail, yet simple
+
+## Agent
+
+That reply only states the score. I'll look at the answer rules so an “explain” question gets a simple, more detailed breakdown.
+
+The short answer rules are why that reply stops at the total. An “explain” question for one hub will walk through the points that make up the score, in plain language.
+
+An “explain” question for one hub now walks through the score instead of stopping at the total. Other answers stay short.
+
+Ask something like “explain Chicago’s score.” The reply opens with the score out of 100, then one plain bullet for each factor that actually added points: the name, the points, and what that means. A factor with 0 points, such as no active alerts, is left out. The weight formula and raw field names stay out.
+
+That same Chicago question would look more like this:
+
+Chicago's weather risk score is 32.4 out of 100.
+- Snow days added 12.4 points: snow fell on about a fifth of last year's days.
+- Heavy rain added 15 points: heavy rain was common enough to use the full share of that factor.
+- Freezing days added 5 points: freezing weather showed up, but not on most days.
+
+Tools: `Read`, `Grep`, `Glob`, `StrReplace`, `Write`, `Shell`
+
+## You
+
+when questions why, need to explain, not say the score is reused from cache
+
+## Agent
+
+The “why?” reply is blaming the cache because a reused score is saved as a number only, with no factor breakdown. I’ll store those factors with the score and have “why?” explain them.
+
+A reused score is only the number 32.4, so “why?” has nothing to explain. I’ll save the factor points with the score and have “why?” use those.
+
+A “why?” question now explains the points that make up the score. It no longer says the score was reused or that the breakdown is missing.
+
+Chicago’s 32.4 was saved as a number only, so the next “why?” recalculates it once and stores the factor points with the score. After that, a current score is reused with those points, and the reply is the score plus one plain bullet for each factor that added points.
+
+Tools: `Read`, `Glob`, `StrReplace`, `Write`, `Grep`, `Shell`
+
+## You
+
+@c:\Users\עומרי_שפיצר\.cursor\projects\c-GitProjects-moveo-assignment\terminals\7.txt:113-118 fix
+
+## Agent
+
+`python eval\run.py` from `server` is importing `server.eval`, which is not on the path. I'll check how the runner imports its cases and fix that.
+
+`python eval\run.py` from `server/` starts now. The runner was importing `server.eval`, and that package is not on the path when you launch the file from `server/`.
+
+It adds the `server` directory to the path and imports `eval.cases`. Both of these get past the import:
+
+```powershell
+python eval\run.py
+python -m eval.run
+```
+
+Run them from `server/`. A name that matches no case still exits with status 1, which is the runner reporting that, not an import error.
+
+Tools: `Read`, `Grep`, `StrReplace`, `Shell`, `Glob`
+
+## You
+
+update conversations
+
+## Agent
+
+I'll refresh `docs/conversations` from the latest agent sessions, including this chat.
+
 Tools: `Glob`, `Read`

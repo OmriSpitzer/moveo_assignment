@@ -55,7 +55,7 @@ flowchart TD
 | Tool | File | Reads |
 | --- | --- | --- |
 | `list_hubs` | `tools/hub_tools.py` | `hubs` collection |
-| `score_hubs` | `tools/hub_tools.py` | collection, then writes `score` and `scored_at` |
+| `score_hubs` | `tools/hub_tools.py` | collection; a stale score is written through `set_hub` |
 | `get_location` | `tools/location_tools.py` | Open-Meteo geocoding |
 | `get_weather_history` | `tools/weather_tools.py` | Open-Meteo archive |
 | `get_current_weather` | `tools/weather_tools.py` | Open-Meteo forecast |
@@ -64,6 +64,6 @@ flowchart TD
 
 `list_hubs` and `score_hubs` are the hub tools. `get_location` is the location tool. The four weather and hazard calls are the weather tools. Each of those five takes a list and returns one result per place, in order. A failed place is a `ToolError` in that position.
 
-`score_hubs` calls `ScoreMethod.score_hub`. A stored score older than one day is recalculated. A newer score is reused. Weather is 50 (snow, freezing, heavy rain, high wind), FEMA disasters are 40, and active alerts are 10. A missing section is dropped and the remaining weights are scaled to 100.
+`score_hubs` calls `ScoreMethod.score_hub`. Seeded scores start at 0 with no `scored_at`, so the first scoring run always recalculates them. A missing timestamp, a score with no factor points, or a stored score older than one day, is saved with `set_hub`, which sets `score`, the factor points, and `scored_at`. A current score that already has factor points is reused. A changed number is a `score_alert` for the chat. Weather is 50 (snow, freezing, heavy rain, high wind), FEMA disasters are 40, and active alerts are 10. A missing section is dropped and the remaining weights are scaled to 100.
 
 The system view is [docs/architecture.md](../../docs/architecture.md). The agent sessions are [docs/conversations](../../docs/conversations/README.md).

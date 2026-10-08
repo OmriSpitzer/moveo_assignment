@@ -45,6 +45,7 @@ src/types/                          hub, chat, and agent event types
 - If the typed question does not already name the chosen hub, that hub is added to the message sent to the agent.
 - The Mic button opens English speech recognition. Words appear in the text box as they are heard. A pause ends the take and sends it. A click while listening stops the take and leaves the text in the box.
 - While a tool is running, the assistant card shows that step. The step disappears when the answer arrives.
+- A hub score that changed appears in a yellow list beside the chat. The list scrolls on its own. Each notice leaves after a few seconds, and the chat stays where it was.
 
 Project docs: [README](../README.md), [architecture](../docs/architecture.md), [agent sessions](../docs/conversations/README.md).
 

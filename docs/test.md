@@ -30,6 +30,10 @@ The agent sessions are in [docs/conversations](conversations/README.md).
 - `test_missing_hub_is_one_question`: a question that names no hub does not call a tool, including `list_hubs`. The reply asks which hub, ends with a question mark, and does not describe available data. A data answer does not ask a question.
 - `test_technology_questions_are_out_of_scope`: technology questions are out of scope, tool names are not listed, data sources are not mentioned, and administrators are not mentioned as the people who change hubs.
 
+`tests/test_prompts.py`
+
+- `test_explain_one_score_is_detailed_and_simple`: a why or explain question for one hub skips the short-answer limits. It opens with the score, then one everyday bullet for each factor that added points. A factor with 0 points gets no bullet. The reply does not say the score was reused or that the breakdown is missing.
+
 ## Tools
 
 `tests/tools/test_hub_tools.py`
@@ -37,6 +41,10 @@ The agent sessions are in [docs/conversations](conversations/README.md).
 - `test_registered_tools_are_read_only`: registered tools are `list_hubs`, `score_hubs`, `get_location`, `get_weather_history`, `get_disaster_history`, `get_active_alerts`, and `get_current_weather`. `set_hub` and `decline_request` are not registered.
 - `test_set_hub_does_not_geocode`: `set_hub` does not call `get_location`. Its arguments are city, county, latitude, longitude, region, state, and state code.
 - `test_hub_descriptions_are_one_sentence`: `list_hubs`, `score_hubs`, and `set_hub` each have a description shorter than 160 characters.
+- `test_set_hub_writes_score_and_timestamp`: `set_hub` with a score writes that number and `scored_at`, and does not write `weather`.
+- `test_stale_score_updates_through_set_hub_and_alerts`: a Denver score of 0 from two days ago is recalculated to 65.0 through `set_hub`, and one `score_alert` reports the change from 0.
+- `test_fresh_score_is_kept`: a current score that already has factor points is returned unchanged and is not written.
+- `test_missing_scored_at_is_refreshed`: a score of 0 with no `scored_at` is recalculated to 65.0 through `set_hub`, and one `score_alert` reports the change from 0.
 
 `tests/tools/test_location_tools.py`
 
@@ -53,7 +61,7 @@ The agent sessions are in [docs/conversations](conversations/README.md).
 
 `tests/data/test_seed_hubs.py`
 
-- `test_every_seed_hub_has_coordinates`: there are 14 seed hubs. Each location has latitude and longitude. New York county is `New York`. Denver state code is `CO`.
+- `test_every_seed_hub_has_coordinates`: there are 14 seed hubs. Each score starts at 0 and none has `scored_at`. Each location has latitude and longitude. New York county is `New York`. Denver state code is `CO`.
 
 ## Eval
 
@@ -69,6 +77,12 @@ The agent sessions are in [docs/conversations](conversations/README.md).
 - `test_fake_stream_ends_with_an_answer`: `FakeAgent` yields `tool_call`, `tool_result`, then an answer whose text is `fake answer` and whose model is `fake`.
 - `test_ollama_stream_builds_answer_in_two_places`: `OllamaAgent` has no `_to_answer`. `stream` builds `Answer` once for a structured reply and once for plain text.
 
+## Score alerts
+
+`tests/test_score_alerts.py`
+
+- `test_alerts_sit_beside_the_chat_and_vanish`: a `score_alert` is kept out of the chat message. The yellow list scrolls itself with `scrollTop` and does not call `scrollIntoView`. The chat still scrolls when its messages change.
+
 ## Voice
 
 `tests/test_voice_input.py`
@@ -79,4 +93,4 @@ The agent sessions are in [docs/conversations](conversations/README.md).
 
 `tests/run.py` discovers every `test*.py` file in `server/tests/` and runs that suite. It exits with the suite status.
 
-Result 2026-10-08: `Ran 17 tests` ... `OK`.
+Result 2026-10-08: `Ran 23 tests` ... `OK`.

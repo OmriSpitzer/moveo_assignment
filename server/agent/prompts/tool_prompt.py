@@ -19,5 +19,5 @@ TOOL_PROMPT = """
 	output: current temperature, precipitation, wind, and condition for each point, in the same order. Do not answer that question with get_active_alerts.
 - score_hubs:
 	input: hub city names
-	output: each hub's 0-100 risk score, factor points, excluded sections, and scored_at, highest score first. A stored score no older than one day is reused. A missing score, or one older than one day, is recalculated and saved.
+	output: each hub's 0-100 risk score, factor points, excluded sections, and scored_at, highest score first. Factor points are included when a current score is returned. A missing score, a score with no factor points, or one older than one day, is recalculated and saved.
 """

@@ -19,27 +19,53 @@ from data.manager import DataManager
         get_tools() -> list[Callable[[], Any]]
 """
 
-# Get the stored score
-def _stored_score(raw) -> tuple[RiskScore, datetime] | None:
-    if not isinstance(raw, dict) or raw.get("scored_at") is None:
+_score_alerts: list[dict] = []
+
+# Read a stored number, including an older score document
+def _numeric_score(doc: dict) -> float | None:
+    raw = doc.get("score")
+    if isinstance(raw, dict):
+        raw = raw.get("score")
+    if isinstance(raw, bool) or not isinstance(raw, (int, float)):
         return None
-    scored_at = raw["scored_at"]
+    return float(raw)
+
+# Alerts queued by a score change, drained by the agent stream
+def drain_score_alerts() -> list[dict]:
+    found = list(_score_alerts)
+    _score_alerts.clear()
+    return found
+
+# Get the stored score
+def _stored_score(doc: dict) -> tuple[RiskScore, datetime] | None:
+    raw = doc.get("score")
+    scored_at = doc.get("scored_at")
+    factors = []
+    excluded = []
+    if isinstance(raw, dict):
+        scored_at = raw.get("scored_at", scored_at)
+        factors = [
+            FactorScore(name=row["name"], points=float(row["points"]), weight=float(row["weight"]), detail=row["detail"])
+            for row in raw.get("factors") or []
+        ]
+        excluded = list(raw.get("excluded") or [])
+        raw = raw.get("score")
+    else:
+        factors = [
+            FactorScore(name=row["name"], points=float(row["points"]), weight=float(row["weight"]), detail=row["detail"])
+            for row in doc.get("factors") or []
+            if isinstance(row, dict)
+        ]
+        excluded = list(doc.get("excluded") or [])
+    if isinstance(raw, bool) or not isinstance(raw, (int, float)) or scored_at is None:
+        return None
     if isinstance(scored_at, str):
         scored_at = datetime.fromisoformat(scored_at)
     if not isinstance(scored_at, datetime):
         return None
     if scored_at.tzinfo is None:
         scored_at = scored_at.replace(tzinfo=timezone.utc)
-    factors = [
-        FactorScore(name=row["name"], points=float(row["points"]), weight=float(row["weight"]), detail=row["detail"])
-        for row in raw.get("factors") or []
-    ]
-    score = raw.get("score")
-    return RiskScore(
-        score=None if score is None else float(score),
-        factors=factors,
-        excluded=list(raw.get("excluded") or []),
-    ), scored_at
+    return RiskScore(score=float(raw), factors=factors, excluded=excluded), scored_at
 
 # Build the hub score object
 def _hub_score(doc: dict, risk: RiskScore, scored_at: datetime, refreshed: bool) -> HubScore:
@@ -56,11 +82,22 @@ def _hub_score(doc: dict, risk: RiskScore, scored_at: datetime, refreshed: bool)
         refreshed=refreshed,
     )
 
-# Save the score
+# Save the score through set_hub
 def _save_score(doc: dict, risk: RiskScore, scored_at: datetime) -> None:
-    payload = asdict(risk)
-    payload["scored_at"] = scored_at
-    DbTools.set_fields({"city_key": doc["city_key"]}, {"score": payload})
+    location = doc.get("location") or {}
+    HubTools.set_hub.func(
+        city=doc["city"],
+        state_code=doc["state_code"],
+        region=doc["region"],
+        latitude=location["latitude"],
+        longitude=location["longitude"],
+        county=doc.get("county") or location.get("county"),
+        state=location.get("state"),
+        score=risk.score,
+        scored_at=scored_at,
+        factors=[asdict(factor) for factor in risk.factors],
+        excluded=list(risk.excluded),
+    )
 
 # Refresh the scores
 def _refresh_scores(pending: list[tuple[int, dict]], results: list, now: datetime) -> None:
@@ -85,7 +122,15 @@ def _refresh_scores(pending: list[tuple[int, dict]], results: list, now: datetim
             for item in (weather[n], disasters[n], alerts[n])
         )
         if complete and risk.score is not None:
+            previous = _numeric_score(doc)
             _save_score(doc, risk, now)
+            if previous != risk.score:
+                _score_alerts.append({
+                    "type": "score_alert",
+                    "city": doc["city"],
+                    "previous": 0.0 if previous is None else previous,
+                    "score": risk.score,
+                })
         results[i] = _hub_score(doc, risk, now, refreshed=True)
 
 class HubTools:
@@ -121,8 +166,8 @@ class HubTools:
             if doc is None:
                 results[i] = ToolError(source="hubs", error=f"{city} is not a company hub")
                 continue
-            stored = _stored_score(doc.get("score"))
-            if stored is not None and not ScoreMethod.score_needs_refresh(stored[1], now):
+            stored = _stored_score(doc)
+            if stored is not None and stored[0].factors and not ScoreMethod.score_needs_refresh(stored[1], now):
                 results[i] = _hub_score(doc, stored[0], stored[1], refreshed=False)
                 continue
             location = doc.get("location") or {}
@@ -142,8 +187,29 @@ class HubTools:
     def set_hub(
         city: str, state_code: str, region: Literal["Northeast", "Midwest", "South", "West"],
         latitude: float, longitude: float, county: str | None = None, state: str | None = None,
+        score: float | None = None, scored_at: datetime | None = None,
+        factors: list | None = None, excluded: list | None = None,
     ) -> Hub | ToolError:
         """Add or update a hub. Call only when the user asks to add or change one."""
+
+        if score is not None:
+            key = DataManager.hub_key(city)
+            found = DbTools.find_one({"city_key": key})
+            if found is None:
+                return ToolError(source="hubs", error=f"{city} is not a company hub")
+            when = scored_at or datetime.now(timezone.utc)
+            if when.tzinfo is None:
+                when = when.replace(tzinfo=timezone.utc)
+            fields = {"score": float(score), "scored_at": when}
+            if factors is not None:
+                fields["factors"] = factors
+            if excluded is not None:
+                fields["excluded"] = list(excluded)
+            DbTools.set_fields({"city_key": key}, fields)
+            return Hub(
+                city=found["city"], state_code=found["state_code"], region=found["region"],
+                county=found.get("county") or county, latitude=latitude, longitude=longitude,
+            )
 
         location = Location(
             source="open-meteo-geocoding",

@@ -2,10 +2,11 @@ import { useEffect, useRef, useState, type SubmitEvent, type KeyboardEvent } fro
 import { ChatDisplay } from './components/ChatDisplay'
 import { Header } from './components/Header'
 import HubsDropUp from './components/HubsDropUp'
+import { ScoreAlerts } from './components/ScoreAlerts'
 import { VoiceInput } from './components/VoiceInput'
 import { fetchHubs, streamAgent } from './services/api'
 import { applyEvent } from './services/chat'
-import type { ChatMessage, Hub } from './types'
+import { ALERT_MS, type ChatMessage, type Hub, type ScoreAlert } from './types'
 
 /**
  * Main app component
@@ -20,6 +21,7 @@ const App = () => {
   const [hubs, setHubs] = useState<Hub[]>([])                       // Hubs
   const [hubsError, setHubsError] = useState(false)                 // Hubs error
   const [selectedHub, setSelectedHub] = useState('')                // Selected hub
+  const [alerts, setAlerts] = useState<ScoreAlert[]>([])            // Score changes beside the chat
   const inputRef = useRef(input)                                    // Latest input text
   const speechBase = useRef<string | null>(null)                    // Text before the mic opened
   inputRef.current = input
@@ -68,7 +70,15 @@ const App = () => {
 
     // Stream the agent response
     try {
-      await streamAgent(history, threadId, (event) => updateLast((m) => applyEvent(m, event)))
+      await streamAgent(history, threadId, (event) => {
+        if (event.type !== 'score_alert') {
+          updateLast((m) => applyEvent(m, event))
+          return
+        }
+        const id = crypto.randomUUID()
+        setAlerts((prev) => [...prev, { id, city: event.city, previous: event.previous, score: event.score }])
+        window.setTimeout(() => setAlerts((prev) => prev.filter((item) => item.id !== id)), ALERT_MS)
+      })
     } catch (e) {
       updateLast((m) => ({ ...m, content: e instanceof Error ? e.message : String(e), error: true }))
     } finally {
@@ -138,8 +148,11 @@ const App = () => {
       {/* Header */}
       <Header />
 
-      {/* Chat display with user */}
-      <ChatDisplay messages={messages} hubs={hubs} onSuggest={send} />
+      {/* Chat display with user. Alerts sit beside it and do not scroll this view. */}
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        <ChatDisplay messages={messages} hubs={hubs} onSuggest={send} />
+        <ScoreAlerts alerts={alerts} />
+      </div>
 
       <form onSubmit={onSubmit} className="border-t border-slate-200 bg-white px-4 py-3">
         <div className="mx-auto flex max-w-3xl items-end gap-2">
