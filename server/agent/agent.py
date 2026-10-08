@@ -13,7 +13,7 @@ from agent.providers.fake_agent import FakeAgent
         stream: stream a response from the agent
 """
 class Agent():
-    def __init__(self, is_fake:bool = True):
+    def __init__(self, is_fake:bool = False):
         self.agent = OllamaAgent() if not is_fake else FakeAgent()
 
     # get a response from the agent

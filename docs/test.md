@@ -10,6 +10,8 @@ python server/tests/run.py
 
 `run.py` discovers every test file in `server/tests/` and runs that suite. `server/` stays on the import path, so `agent`, `data`, and `eval` import.
 
+The agent sessions are in [docs/conversations](conversations/README.md).
+
 ## Scoring
 
 `tests/scoring/test_score.py`
@@ -67,8 +69,14 @@ python server/tests/run.py
 - `test_fake_stream_ends_with_an_answer`: `FakeAgent` yields `tool_call`, `tool_result`, then an answer whose text is `fake answer` and whose model is `fake`.
 - `test_ollama_stream_builds_answer_in_two_places`: `OllamaAgent` has no `_to_answer`. `stream` builds `Answer` once for a structured reply and once for plain text.
 
+## Voice
+
+`tests/test_voice_input.py`
+
+- `test_pause_sends_and_a_click_only_stops`: after the listen pause the microphone marks the turn to send, then stops. A click while listening clears that mark and stops without sending. A recognition error does not send. The chat sends that transcript when the pause ends.
+
 ## Runner
 
 `tests/run.py` discovers every `test*.py` file in `server/tests/` and runs that suite. It exits with the suite status.
 
-Result 2026-10-07: `Ran 16 tests` ... `OK`.
+Result 2026-10-08: `Ran 17 tests` ... `OK`.

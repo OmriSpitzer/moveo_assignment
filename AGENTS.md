@@ -9,7 +9,8 @@ Before implementing, read `docs/requirements.md`, `docs/architecture.md`, `docs/
 - Don't change the overall architecture of the system
 - Don't infer, check with user if you do not understand
 - Don't change comments
-- Requirements live in `docs/requirements.md`. Update their status there, and add a timestamped entry to its work log for all work done
+- Requirements live in `docs/requirements.md`. Update their status there, and add a timestamped entry to its work log for all work done. Each entry is one short sentence: what changed, with no test output or step-by-step detail
 - Change the architecture in `docs/architecture.md` only to the specific.
 - Unit tests live in `server/tests/`. Add a folder there when the area does not already have one. For each implementation, add a test in that tree and list the case by subject in `docs/test.md`. Run all tests with `python server/tests/run.py`.
+- Agent sessions for this project are in `docs/conversations`.
 

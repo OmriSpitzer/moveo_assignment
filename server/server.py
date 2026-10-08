@@ -24,7 +24,7 @@ app.include_router(router, prefix="/api")
 # Browser and editor probes request these on the process port
 @app.get("/json/version")
 def json_version():
-    return {"message": "Weather Risk API"}
+    return {"message": "Weather Risk API", "version": "1.0.0"}
 
 static_dir = Path(__file__).resolve().parent / "static"
 if static_dir.is_dir():

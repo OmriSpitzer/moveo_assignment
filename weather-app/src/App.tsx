@@ -78,13 +78,17 @@ const App = () => {
   }
 
   // Send the input, adding the selected hub when the text does not name it
+  const questionFor = (typed: string) => {
+    const text = typed.trim()
+    if (!text) return ''
+    return selectedHub && !text.toLowerCase().includes(selectedHub.toLowerCase())
+      ? `${text} ${selectedHub}`
+      : text
+  }
+
   const sendInput = () => {
-    const typed = input.trim()
-    if (!typed) return
-    const question =
-      selectedHub && !typed.toLowerCase().includes(selectedHub.toLowerCase())
-        ? `${typed} ${selectedHub}`
-        : typed
+    const question = questionFor(input)
+    if (!question) return
     void send(question)
   }
 
@@ -101,9 +105,18 @@ const App = () => {
   }
 
   // Insert the transcript into the input
-  const insertTranscript = (spoken: string) => {
-    applySpoken(spoken)
+  const insertTranscript = (spoken: string, sendNow = false) => {
+    const base = speechBase.current
+    const heard = spoken.trim()
+    const text =
+      base === null ? inputRef.current : heard ? (base.trim() ? `${base.trimEnd()} ${heard}` : heard) : base
     speechBase.current = null
+    const question = questionFor(text)
+    if (!sendNow || isStreaming || !question) {
+      setInput(text)
+      return
+    }
+    void send(question)
   }
 
   // Handle form submission

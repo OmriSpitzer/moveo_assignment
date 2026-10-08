@@ -25,12 +25,13 @@ export const VoiceInput = ({
   disabled: boolean
   onBegin: () => void
   onPartial: (text: string) => void
-  onTranscript: (text: string) => void
+  onTranscript: (text: string, sendNow: boolean) => void
 }) => {
   const [listening, setListening] = useState(false)
   const [unsupported, setUnsupported] = useState(false)
   const recognitionRef = useRef<EnglishRecognizer | null>(null)
   const pauseRef = useRef<number | null>(null)
+  const sendOnEndRef = useRef(false)
   const transcriptRef = useRef('')
   const onBeginRef = useRef(onBegin)
   const onPartialRef = useRef(onPartial)
@@ -52,7 +53,9 @@ export const VoiceInput = ({
 
   useEffect(() => {
     if (!disabled) return
+    sendOnEndRef.current = false
     if (pauseRef.current !== null) window.clearTimeout(pauseRef.current)
+    pauseRef.current = null
     recognitionRef.current?.stop()
   }, [disabled])
 
@@ -73,19 +76,26 @@ export const VoiceInput = ({
         .trim()
       if (aliveRef.current) onPartialRef.current(transcriptRef.current)
       if (pauseRef.current !== null) window.clearTimeout(pauseRef.current)
-      pauseRef.current = window.setTimeout(() => recognition.stop(), PAUSE_MS)
+      pauseRef.current = window.setTimeout(() => {
+        pauseRef.current = null
+        sendOnEndRef.current = true
+        recognition.stop()
+      }, PAUSE_MS)
     }
     recognition.onerror = () => {
+      sendOnEndRef.current = false
       recognition.stop()
     }
     recognition.onend = () => {
       if (pauseRef.current !== null) window.clearTimeout(pauseRef.current)
       pauseRef.current = null
+      const sendNow = sendOnEndRef.current
+      sendOnEndRef.current = false
       setListening(false)
       recognitionRef.current = null
       const spoken = transcriptRef.current.trim()
       transcriptRef.current = ''
-      if (aliveRef.current) onTranscriptRef.current(spoken)
+      if (aliveRef.current) onTranscriptRef.current(spoken, sendNow)
     }
     recognitionRef.current = recognition
     setListening(true)
@@ -93,7 +103,9 @@ export const VoiceInput = ({
   }
 
   const stop = () => {
+    sendOnEndRef.current = false
     if (pauseRef.current !== null) window.clearTimeout(pauseRef.current)
+    pauseRef.current = null
     recognitionRef.current?.stop()
   }
 

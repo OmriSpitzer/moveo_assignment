@@ -1,5 +1,7 @@
 # Weather Risk chat
 
+![React 19.2.8](https://img.shields.io/badge/React-19.2.8-61DAFB?style=for-the-badge&logo=react&logoColor=black) ![TypeScript 6.0.2](https://img.shields.io/badge/TypeScript-6.0.2-3178C6?style=for-the-badge&logo=typescript&logoColor=white) ![Vite 8.3.0](https://img.shields.io/badge/Vite-8.3.0-646CFF?style=for-the-badge&logo=vite&logoColor=white) ![Tailwind CSS 4.3.3](https://img.shields.io/badge/Tailwind_CSS-4.3.3-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white) 
+
 React client for the weather-risk agent. The UI does not call weather, hazard, or geocoding APIs. Hub lists and answers come from the FastAPI service through the Vite `/api` proxy.
 
 ## Stack
@@ -33,11 +35,16 @@ src/services/chat.ts                stream events become the visible tool step
 src/types/                          hub, chat, and agent event types
 ```
 
+
+
 ## Chat behavior
 
 - Suggestion buttons appear on an empty chat, and only after hubs have loaded. Each question is written from those hubs.
 - The hub picker keeps the chosen city and tints its background. The city is not written into the text box.
 - Send does nothing when the text box is empty.
 - If the typed question does not already name the chosen hub, that hub is added to the message sent to the agent.
-- The Mic button opens English speech recognition. Words appear in the text box as they are heard. A pause ends the take. Send is still a separate click.
+- The Mic button opens English speech recognition. Words appear in the text box as they are heard. A pause ends the take and sends it. A click while listening stops the take and leaves the text in the box.
 - While a tool is running, the assistant card shows that step. The step disappears when the answer arrives.
+
+Project docs: [README](../README.md), [architecture](../docs/architecture.md), [agent sessions](../docs/conversations/README.md).
+
